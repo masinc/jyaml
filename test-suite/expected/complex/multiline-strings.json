@@ -1,0 +1,1 @@
+{"literal": "Line 1\nLine 2\nLine 3\n", "folded": "This is a long paragraph that will be folded into a single line.\n", "literal_strip": "No trailing newline\nhere", "folded_keep": "Keep trailing\nnewlines\n\n"}

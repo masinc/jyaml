@@ -1,0 +1,4 @@
+# Scientific notation numbers
+"small": 1.23e-10
+"large": 9.87E+15
+"negative": -4.56e-3

@@ -1,0 +1,8 @@
+# Mixed block and flow styles
+"users":
+  - {"name": "Alice", "age": 25}
+  - {"name": "Bob", "age": 30}
+"config": {
+  "debug": true,
+  "features": ["auth", "api", "ui"]
+}

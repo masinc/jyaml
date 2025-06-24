@@ -1,0 +1,5 @@
+# Invalid: YAML boolean aliases not supported
+"yes_value": yes
+"no_value": no
+"on_value": on
+"off_value": off

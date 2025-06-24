@@ -1,0 +1,3 @@
+# Invalid: unquoted object key
+name: "Alice"
+age: 25

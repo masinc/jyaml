@@ -1,0 +1,5 @@
+# Escape sequences in strings
+"quotes": "He said \"Hello World\""
+"backslash": "Path: C:\\Users\\Name"
+"unicode": "Unicode: \u03B1\u03B2\u03B3"
+"newlines": "Line 1\nLine 2\tTabbed"

@@ -1,0 +1,5 @@
+# Valid: trailing comma supported in JYAML
+[
+  "first",
+  "second",
+]

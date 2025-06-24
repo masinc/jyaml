@@ -1,0 +1,5 @@
+# Valid: trailing comma in object
+{
+  "name": "Alice",
+  "age": 30,
+}

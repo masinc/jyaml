@@ -1,0 +1,4 @@
+# Invalid: duplicate keys in object
+"name": "Alice"
+"age": 25
+"name": "Bob"

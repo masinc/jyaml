@@ -1,0 +1,19 @@
+# Multi-line strings with different chomping
+"literal": |
+  Line 1
+  Line 2
+  Line 3
+
+"folded": >
+  This is a long
+  paragraph that will
+  be folded into a
+  single line.
+
+"literal_strip": |-
+  No trailing newline
+  here
+
+"folded_keep": >+
+  Keep trailing
+  newlines

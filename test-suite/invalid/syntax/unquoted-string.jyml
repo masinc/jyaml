@@ -1,0 +1,2 @@
+# Invalid: unquoted string (JYAML requires quotes)
+hello world

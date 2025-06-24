@@ -1,0 +1,12 @@
+# Complex nested objects
+"user": {
+  "name": "Alice",
+  "contact": {
+    "email": "alice@example.com",
+    "phone": "+1-555-0123"
+  },
+  "preferences": {
+    "theme": "dark",
+    "notifications": true
+  }
+}

@@ -1,0 +1,5 @@
+# Invalid: inconsistent indentation levels
+"object":
+  "level1": "value"
+    "level2": "wrong indent"
+  "back": "correct"
