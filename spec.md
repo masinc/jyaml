@@ -1,4 +1,4 @@
-# JYAML Specification Version 0.2
+# JYAML Specification Version 0.3
 
 ## Overview
 
@@ -17,6 +17,7 @@ JYAML (JSON-YAML Adaptive Markup Language) is a data format that combines the ad
 - Low learning costs for those familiar with both JSON and YAML.
 - The format provides the readability of YAML while maintaining the simplicity of JSON's structure.
 - Single-line comments can be written in `#`.
+- Trailing commas are supported for developer convenience and easier editing.
 - It supports both JSON and YAML intermediate data structures, allowing for easy conversion between the two formats when exchanging data.
 - Since it is upward compatible with JSON, JSON data is also suitable as JYAML data, allowing for a smooth transition.
 - Backward compatible with YAML, JYAML data is suitable as YAML data; if your system or application does not take advantage of YAML-specific features, you can use JYAML as is.
@@ -360,7 +361,7 @@ Array type is a type with zero or more values.
 Array type can be written in block style or flow style.
 
 Block style can be expressed by indenting each value with a new line.
-Flow style is represented by enclosing the list of values in square brackets (`[`, `]`) and separating the values with commas (`,`).
+Flow style is represented by enclosing the list of values in square brackets (`[`, `]`) and separating the values with commas (`,`). Optional trailing commas are allowed for convenience.
 
 
 Example block style:
@@ -375,6 +376,9 @@ Example flow style:
 
 ```
 [ 1, 2, 3 ]
+
+# Trailing comma allowed
+[ 1, 2, 3, ]
 ```
 
 Example of arrays containing objects:
@@ -411,7 +415,7 @@ Keys can only be of type String. Multi-line string expressions are not allowed, 
 Object types can be written in either block style or flow style.
 
 Block style can be expressed by indenting pairs with newlines.
-Flow style is represented by enclosing pairs in braces (`{`, `}`) and separating keys and values with commas (`,`).
+Flow style is represented by enclosing pairs in braces (`{`, `}`) and separating keys and values with commas (`,`). Optional trailing commas are allowed for convenience.
 
 Example block style:
 
@@ -425,6 +429,9 @@ Example flow style:
 
 ```
 { "a": 1, "b": 2, 'c': 3 }
+
+# Trailing comma allowed
+{ "a": 1, "b": 2, 'c': 3, }
 ```
 
 Example of objects containing arrays:
