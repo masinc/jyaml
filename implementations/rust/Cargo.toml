@@ -1,0 +1,19 @@
+[package]
+name = "jyaml"
+version = "0.1.0"
+edition = "2024"
+authors = ["JYAML Contributors"]
+description = "A Rust implementation of JYAML (JSON-YAML Adaptive Markup Language)"
+repository = "https://github.com/masinc/jyaml"
+license = "MIT OR Apache-2.0"
+keywords = ["jyaml", "json", "yaml", "parser", "serialization"]
+categories = ["parser-implementations", "encoding"]
+readme = "README.md"
+
+[dependencies]
+thiserror = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1.0"
+pretty_assertions = "1.4"
