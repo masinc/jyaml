@@ -27,20 +27,20 @@ fn main() {
         Err(e) => println!("  Error: {}\n", e),
     }
 
-    // Example 4: Trailing comma in array
+    // Example 4: Trailing comma in array (now valid in JYAML 0.3)
     println!("4. Trailing comma in array:");
-    let bad4 = "[1, 2, 3,]";
-    match parse(bad4) {
-        Ok(value) => println!("  Unexpected success: {:?}", value),
-        Err(e) => println!("  Error: {}\n", e),
+    let good4 = "[1, 2, 3,]";
+    match parse(good4) {
+        Ok(value) => println!("  Success: {:?}\n", value),
+        Err(e) => println!("  Unexpected error: {}\n", e),
     }
 
-    // Example 5: Trailing comma in object
+    // Example 5: Trailing comma in object (now valid in JYAML 0.3)
     println!("5. Trailing comma in object:");
-    let bad5 = r#"{"name": "test", "age": 30,}"#;
-    match parse(bad5) {
-        Ok(value) => println!("  Unexpected success: {:?}", value),
-        Err(e) => println!("  Error: {}\n", e),
+    let good5 = r#"{"name": "test", "age": 30,}"#;
+    match parse(good5) {
+        Ok(value) => println!("  Success: {:?}\n", value),
+        Err(e) => println!("  Unexpected error: {}\n", e),
     }
 
     // Example 6: Duplicate keys

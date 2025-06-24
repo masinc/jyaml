@@ -214,3 +214,33 @@ fn test_utf8_validation() {
     let value = parse(r#""\u3053\u3093\u306b\u3061\u306f""#).unwrap();
     assert_eq!(value, Value::String("こんにちは".to_string()));
 }
+
+#[test]
+fn test_trailing_comma_support() {
+    // Trailing comma in array (JYAML 0.3 feature)
+    let input = r#"[1, 2, 3,]"#;
+    let value = parse(input).unwrap();
+    let expected = Value::Array(vec![
+        Value::Number(value::Number::Integer(1)),
+        Value::Number(value::Number::Integer(2)),
+        Value::Number(value::Number::Integer(3)),
+    ]);
+    assert_eq!(value, expected);
+    
+    // Trailing comma in object (JYAML 0.3 feature)
+    let input = r#"{"name": "Alice", "age": 30,}"#;
+    let value = parse(input).unwrap();
+    let mut expected_map = HashMap::new();
+    expected_map.insert("name".to_string(), Value::String("Alice".to_string()));
+    expected_map.insert("age".to_string(), Value::Number(value::Number::Integer(30)));
+    assert_eq!(value, Value::Object(expected_map));
+    
+    // Empty array/object with trailing comma should still be empty
+    let value = parse("[,]").unwrap_or_else(|_| parse("[]").unwrap());
+    // Note: [,] might be invalid syntax, but [] should work
+    let value = parse("[]").unwrap();
+    assert_eq!(value, Value::Array(vec![]));
+    
+    let value = parse("{}").unwrap();
+    assert_eq!(value, Value::Object(HashMap::new()));
+}

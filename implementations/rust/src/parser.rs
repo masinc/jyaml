@@ -131,9 +131,9 @@ impl<'a> Parser<'a> {
                 self.advance()?;
                 self.skip_whitespace_and_comments();
                 
-                // Check for trailing comma (comma followed by closing bracket)
+                // Allow trailing comma (comma followed by closing bracket)
                 if matches!(self.current_token, Token::RightBracket) {
-                    return self.error("Trailing comma not allowed in array");
+                    break;
                 }
             } else if !matches!(self.current_token, Token::RightBracket) {
                 return self.error("Expected ',' or ']'");
@@ -184,9 +184,9 @@ impl<'a> Parser<'a> {
                 self.advance()?;
                 self.skip_whitespace_and_comments();
                 
-                // Check for trailing comma (comma followed by closing brace)
+                // Allow trailing comma (comma followed by closing brace)
                 if matches!(self.current_token, Token::RightBrace) {
-                    return self.error("Trailing comma not allowed in object");
+                    break;
                 }
             } else if !matches!(self.current_token, Token::RightBrace) {
                 return self.error("Expected ',' or '}'");
@@ -915,8 +915,8 @@ mod tests {
         // Missing colon in object
         assert!(parse(r#"{"key" "value"}"#).is_err());
         
-        // Trailing comma in array
-        assert!(parse("[1, 2,]").is_err());
+        // Trailing comma in array is now valid in JYAML 0.3
+        assert!(parse("[1, 2,]").is_ok());
     }
 
     #[test]
