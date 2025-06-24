@@ -50,10 +50,15 @@ impl<'a> Parser<'a> {
     }
     
     fn parse_value(&mut self) -> Result<Value> {
+        self.parse_value_with_indent_context(0)
+    }
+    
+    fn parse_value_with_indent_context(&mut self, expected_indent: usize) -> Result<Value> {
         // Skip indentation if present
         if let Token::Indent(_) = self.current_token {
             self.advance()?;
         }
+        
         
         match &self.current_token {
             Token::Null => {
@@ -86,7 +91,13 @@ impl<'a> Parser<'a> {
             }
             Token::LeftBracket => self.parse_flow_array(),
             Token::LeftBrace => self.parse_flow_object(),
-            Token::Dash => self.parse_block_array(),
+            Token::Dash => {
+                if expected_indent == 0 {
+                    self.parse_block_array_with_context(None)
+                } else {
+                    self.parse_block_array_with_context(Some(expected_indent))
+                }
+            },
             Token::Pipe | Token::PipeStrip => self.parse_literal_string(),
             Token::Greater | Token::GreaterStrip => self.parse_folded_string(),
             _ => self.error("Expected value"),
@@ -186,43 +197,120 @@ impl<'a> Parser<'a> {
         Ok(Value::Object(object))
     }
     
-    fn parse_block_array(&mut self) -> Result<Value> {
+    fn parse_block_array_with_context(&mut self, context_indent: Option<usize>) -> Result<Value> {
         let mut array = Vec::new();
         
-        // Determine the base indent from the first dash
-        let base_indent = if matches!(self.current_token, Token::Indent(_)) {
-            self.current_indent()
+        // Determine the base indent from the current position
+        // If we're already at an indent token, use that level
+        // Otherwise, we expect the next line to have indentation
+        let mut base_indent = context_indent;
+        
+        
+        // If we already have a context_indent and we are at a dash immediately,
+        // process it without requiring an indent token first
+        if base_indent.is_some() && matches!(self.current_token, Token::Dash) {
+            // Jump to dash processing
+            self.advance()?; // Skip -
+            self.skip_inline_whitespace();
+            let element = self.parse_array_element(base_indent)?;
+            array.push(element);
+            
+            self.skip_newlines_and_comments();
         } else {
-            0
-        };
+            self.skip_newlines_and_comments();
+        }
         
         loop {
-            // Skip any indentation first
-            if let Token::Indent(n) = self.current_token {
-                if n != base_indent {
-                    break;
-                }
-                self.advance()?;
-            }
+            // Store the current indent level before processing
+            let current_indent_level = self.current_indent();
             
-            if !matches!(self.current_token, Token::Dash) {
+            // If we encounter an indent token, this might be our base indent
+            if let Token::Indent(n) = self.current_token {
+                if base_indent.is_none() {
+                    // Set base_indent when we first encounter an indent with a dash
+                    self.advance()?;
+                    if matches!(self.current_token, Token::Dash) {
+                        base_indent = Some(n);
+                        // Continue to dash processing below
+                    } else {
+                        continue;
+                    }
+                } else if Some(n) != base_indent {
+                    // Different indentation level, we're done with this array
+                    break;
+                } else {
+                    // Same indent level as before
+                    self.advance()?;
+                    if matches!(self.current_token, Token::Dash) {
+                        // Continue to dash processing below
+                    } else {
+                        continue;
+                    }
+                }
+            } else if base_indent.is_some() && current_indent_level == 0 {
+                // We had a base indent but now there's no indent, array is done
+                break;
+            } else if !matches!(self.current_token, Token::Dash) {
+                // No indent and no dash, we're done
                 break;
             }
+            
+            // If we see a string that could be an object key at the root level,
+            // check if it's actually outside this array
+            if matches!(self.current_token, Token::String(_)) {
+                if let Ok(peek_token) = self.peek() {
+                    if matches!(peek_token, Token::Colon) {
+                        // This looks like a key-value pair
+                        // If we have a base indent and we're not at that level, 
+                        // this terminates the array
+                        if base_indent.is_some() && self.current_indent() == 0 {
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            // We should only get here if we have a dash token
+            assert!(matches!(self.current_token, Token::Dash));
             
             self.advance()?; // Skip -
             self.skip_inline_whitespace();
             
-            array.push(self.parse_value()?);
+            // Parse array element with special handling for objects
+            let element = self.parse_array_element(base_indent)?;
+            array.push(element);
             
+            // Skip trailing whitespace and comments on the same line
             self.skip_newlines_and_comments();
         }
         
         Ok(Value::Array(array))
     }
     
-    fn parse_object_from_first_key(&mut self, first_key: String) -> Result<Value> {
-        let base_indent = self.current_indent();
+    fn parse_array_element(&mut self, array_base_indent: Option<usize>) -> Result<Value> {
+        // Parse a single array element with proper scope detection
+        match &self.current_token {
+            Token::String(s) => {
+                let value = s.clone();
+                self.advance()?;
+                
+                // Check for object key in array element
+                if matches!(self.current_token, Token::Colon) {
+                    self.parse_array_element_object(value, array_base_indent)
+                } else {
+                    Ok(Value::String(value))
+                }
+            }
+            _ => self.parse_value(),
+        }
+    }
+    
+    fn parse_array_element_object(&mut self, first_key: String, array_base_indent: Option<usize>) -> Result<Value> {
         let mut object = HashMap::new();
+        
+        
+        // Remember the indent level of the first key for this array element
+        let _object_key_indent = array_base_indent.map(|indent| indent + 2).unwrap_or(2);
         
         // Process first key-value pair
         self.advance()?; // Skip :
@@ -244,59 +332,211 @@ impl<'a> Parser<'a> {
         
         self.skip_newlines_and_comments();
         
-        // Process remaining key-value pairs
-        while let Token::String(key) = &self.current_token.clone() {
-            // Check if we're at the correct indentation level for more keys
-            let current_indent = self.current_indent();
-            if current_indent != base_indent {
+        // Process remaining key-value pairs for this array element
+        // The object continues until we hit:
+        // 1. Another dash at the array's base indent (next array element)
+        // 2. A key at indent 0 (outside the array) 
+        // 3. EOF
+        loop {
+            self.skip_newlines_and_comments();
+            
+            // Skip indent tokens and then check for string
+            let current_indent = if let Token::Indent(n) = self.current_token {
+                self.advance()?;
+                n
+            } else {
+                0
+            };
+            
+            if let Token::String(key) = &self.current_token.clone() {
+                
+                // Check if this is a new array element
+                if let Some(array_indent) = array_base_indent {
+                    if current_indent == array_indent {
+                        // Look ahead to see if this is followed by a dash
+                        if let Ok(peek_token) = self.peek() {
+                            if matches!(peek_token, Token::Dash) {
+                                // This is a new array element, stop here
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                // Check if this is a root-level key (outside the array)
+                if current_indent == 0 {
+                    if let Ok(peek_token) = self.peek() {
+                        if matches!(peek_token, Token::Colon) {
+                            // This is a root-level key, array element ends here
+                            break;
+                        }
+                    }
+                }
+                
+                // Check if we're at the expected indent level for this object
+                // For array elements, the first key is right after the dash (no extra indent)
+                // Subsequent keys should be at the same level as the first key
+                if let Some(array_indent) = array_base_indent {
+                    // Keys in array element objects should be at array_base_indent + 2 (after the dash)
+                    let expected_indent = array_indent + 2;
+                    if current_indent != expected_indent {
+                        break;
+                    }
+                } else {
+                    // If no array base indent, this shouldn't happen in array context
+                    break;
+                }
+                
+                let key = key.clone();
+                self.advance()?;
+                
+                self.skip_inline_whitespace();
+                
+                if !matches!(self.current_token, Token::Colon) {
+                    return self.error("Expected ':' after object key");
+                }
+                self.advance()?;
+                
+                self.skip_inline_whitespace();
+                
+                // Check if there's a newline after colon (indicates block style value)
+                if matches!(self.current_token, Token::Newline) {
+                    self.advance()?; // Skip newline
+                    self.skip_newlines_and_comments();
+                    
+                    // Parse block style value
+                    let value = self.parse_value()?;
+                    
+                    if object.contains_key(&key) {
+                        return Err(Error::DuplicateKey {
+                            line: self.lexer.current_position().0,
+                            column: self.lexer.current_position().1,
+                            key,
+                        });
+                    }
+                    
+                    object.insert(key, value);
+                } else {
+                    // Parse inline value
+                    let value = self.parse_value()?;
+                    
+                    if object.contains_key(&key) {
+                        return Err(Error::DuplicateKey {
+                            line: self.lexer.current_position().0,
+                            column: self.lexer.current_position().1,
+                            key,
+                        });
+                    }
+                    
+                    object.insert(key, value);
+                }
+                
+                self.skip_newlines_and_comments();
+            } else {
                 break;
             }
-            
-            let key = key.clone();
-            self.advance()?;
-            
-            self.skip_inline_whitespace();
-            
-            if !matches!(self.current_token, Token::Colon) {
-                return self.error("Expected ':' after object key");
-            }
-            self.advance()?;
-            
-            self.skip_inline_whitespace();
-            
-            // Check if there's a newline after colon (indicates block style value)
-            if matches!(self.current_token, Token::Newline) {
-                self.advance()?; // Skip newline
-                self.skip_newlines_and_comments();
-                
-                // Parse block style value
-                let value = self.parse_value()?;
-                
-                if object.contains_key(&key) {
-                    return Err(Error::DuplicateKey {
-                        line: self.lexer.current_position().0,
-                        column: self.lexer.current_position().1,
-                        key,
-                    });
-                }
-                
-                object.insert(key, value);
-            } else {
-                // Parse inline value
-                let value = self.parse_value()?;
-                
-                if object.contains_key(&key) {
-                    return Err(Error::DuplicateKey {
-                        line: self.lexer.current_position().0,
-                        column: self.lexer.current_position().1,
-                        key,
-                    });
-                }
-                
-                object.insert(key, value);
-            }
-            
+        }
+        
+        Ok(Value::Object(object))
+    }
+    
+    fn parse_object_from_first_key(&mut self, first_key: String) -> Result<Value> {
+        let mut object = HashMap::new();
+        
+        // Process first key-value pair
+        self.advance()?; // Skip :
+        self.skip_inline_whitespace();
+        
+        // Check if there's a newline after colon (indicates block style value)
+        if matches!(self.current_token, Token::Newline) {
+            self.advance()?; // Skip newline
             self.skip_newlines_and_comments();
+            
+            // Parse block style value with indent context
+            let current_indent = self.current_indent();
+            let value = self.parse_value_with_indent_context(current_indent)?;
+            object.insert(first_key, value);
+        } else {
+            // Parse inline value
+            let value = self.parse_value()?;
+            object.insert(first_key, value);
+        }
+        
+        self.skip_newlines_and_comments();
+        
+        // The base indentation for keys is 0 (no indentation)
+        let base_indent = 0;
+        
+        // Process remaining key-value pairs
+        loop {
+            // Skip any remaining indentation or newlines first
+            self.skip_newlines_and_comments();
+            
+            match &self.current_token {
+                Token::String(key) => {
+                    // Check if we're at the correct indentation level for more keys
+                    let current_indent = self.current_indent();
+                    if current_indent != base_indent {
+                        break;
+                    }
+                    
+                    let key = key.clone();
+                    self.advance()?;
+                    
+                    self.skip_inline_whitespace();
+                    
+                    if !matches!(self.current_token, Token::Colon) {
+                        return self.error("Expected ':' after object key");
+                    }
+                    self.advance()?;
+                    
+                    self.skip_inline_whitespace();
+                    
+                    // Check if there's a newline after colon (indicates block style value)
+                    if matches!(self.current_token, Token::Newline) {
+                        self.advance()?; // Skip newline
+                        self.skip_newlines_and_comments();
+                        
+                        // Parse block style value
+                        let value = self.parse_value()?;
+                        
+                        if object.contains_key(&key) {
+                            return Err(Error::DuplicateKey {
+                                line: self.lexer.current_position().0,
+                                column: self.lexer.current_position().1,
+                                key,
+                            });
+                        }
+                        
+                        object.insert(key, value);
+                    } else {
+                        // Parse inline value
+                        let value = self.parse_value()?;
+                        
+                        if object.contains_key(&key) {
+                            return Err(Error::DuplicateKey {
+                                line: self.lexer.current_position().0,
+                                column: self.lexer.current_position().1,
+                                key,
+                            });
+                        }
+                        
+                        object.insert(key, value);
+                    }
+                    
+                    self.skip_newlines_and_comments();
+                }
+                Token::Eof => break,
+                Token::Newline | Token::Comment(_) => {
+                    self.advance()?;
+                }
+                Token::Indent(_) => {
+                    // If there's indentation, it might be for a nested structure
+                    // that we've already processed, so skip it
+                    self.advance()?;
+                }
+                _ => break,
+            }
         }
         
         Ok(Value::Object(object))
@@ -741,4 +981,367 @@ mod tests {
             panic!("Root should be an object");
         }
     }
+
+    #[test]
+    fn test_array_element_objects_multiple_keys() {
+        // Test the core functionality we just fixed: array elements with multiple object keys
+        let input = r#""users":
+  - "name": "Alice"
+    "age": 30
+"config":
+  "timeout": 30"#;
+        let result = parse(input).unwrap();
+        
+        if let Value::Object(obj) = result {
+            assert!(obj.contains_key("users"));
+            assert!(obj.contains_key("config"));
+            
+            if let Some(Value::Array(users)) = obj.get("users") {
+                assert_eq!(users.len(), 1);
+                
+                // Check the user has both name and age
+                if let Some(Value::Object(user)) = users.get(0) {
+                    assert_eq!(user.get("name"), Some(&Value::String("Alice".to_string())));
+                    assert_eq!(user.get("age"), Some(&Value::Number(Number::Integer(30))));
+                    assert_eq!(user.len(), 2); // name and age
+                } else {
+                    panic!("User should be an object");
+                }
+            } else {
+                panic!("users should be an array");
+            }
+        } else {
+            panic!("Root should be an object");
+        }
+    }
+
+    #[test]
+    fn test_nested_array_with_mixed_elements() {
+        let input = r#""data":
+  - "simple_string"
+  - 42
+  - "name": "Complex"
+    "value": 100
+"end": true"#;
+        let result = parse(input).unwrap();
+        
+        if let Value::Object(obj) = result {
+            if let Some(Value::Array(data)) = obj.get("data") {
+                assert_eq!(data.len(), 3);
+                
+                // Element 0: string
+                assert_eq!(data.get(0), Some(&Value::String("simple_string".to_string())));
+                
+                // Element 1: number
+                assert_eq!(data.get(1), Some(&Value::Number(Number::Integer(42))));
+                
+                // Element 2: object with multiple keys
+                if let Some(Value::Object(obj)) = data.get(2) {
+                    assert_eq!(obj.len(), 2);
+                    assert!(obj.contains_key("name"));
+                    assert!(obj.contains_key("value"));
+                } else {
+                    panic!("Element 2 should be an object");
+                }
+            } else {
+                panic!("data should be an array");
+            }
+        } else {
+            panic!("Root should be an object");
+        }
+    }
+
+    #[test]
+    fn test_simple_array_object() {
+        let input = r#""items":
+  - "name": "first"
+    "value": 1
+"total": 10"#;
+        let result = parse(input).unwrap();
+        
+        if let Value::Object(obj) = result {
+            if let Some(Value::Array(items)) = obj.get("items") {
+                assert_eq!(items.len(), 1);
+                
+                if let Some(Value::Object(item)) = items.get(0) {
+                    assert_eq!(item.get("name"), Some(&Value::String("first".to_string())));
+                    assert_eq!(item.get("value"), Some(&Value::Number(Number::Integer(1))));
+                } else {
+                    panic!("Item should be an object");
+                }
+            } else {
+                panic!("items should be an array");
+            }
+        } else {
+            panic!("Root should be an object");
+        }
+    }
+
+    #[test]
+    fn test_empty_array_elements() {
+        let input = r#""mixed":
+  - "value": "present"
+  -
+  - "another": "value""#;
+        // This should fail because empty array elements aren't valid in JYAML
+        assert!(parse(input).is_err());
+    }
+
+
+    #[test]
+    fn test_malformed_array_object_indent() {
+        // Test incorrect indentation in array object
+        let input = r#""users":
+  - "name": "Alice"
+"age": 30  # Wrong indent - should be at same level as "name""#;
+        let result = parse(input).unwrap();
+        
+        // This should parse "age" as a separate top-level key, not part of the array element
+        if let Value::Object(obj) = result {
+            assert!(obj.contains_key("users"));
+            assert!(obj.contains_key("age"));
+            
+            if let Some(Value::Array(users)) = obj.get("users") {
+                if let Some(Value::Object(user)) = users.get(0) {
+                    assert_eq!(user.len(), 1); // Only "name", not "age"
+                    assert!(user.contains_key("name"));
+                    assert!(!user.contains_key("age"));
+                } else {
+                    panic!("User should be an object");
+                }
+            } else {
+                panic!("users should be an array");
+            }
+        } else {
+            panic!("Root should be an object");
+        }
+    }
+
+    #[test]
+    fn test_deeply_nested_array_objects() {
+        let input = r#""levels":
+  - "level": 1
+    "name": "test""#;
+        let result = parse(input).unwrap();
+        
+        if let Value::Object(obj) = result {
+            if let Some(Value::Array(levels)) = obj.get("levels") {
+                if let Some(Value::Object(level_obj)) = levels.get(0) {
+                    assert_eq!(level_obj.get("level"), Some(&Value::Number(Number::Integer(1))));
+                    assert_eq!(level_obj.get("name"), Some(&Value::String("test".to_string())));
+                } else {
+                    panic!("level should be an object");
+                }
+            } else {
+                panic!("levels should be an array");
+            }
+        } else {
+            panic!("Root should be an object");
+        }
+    }
+
+    #[test]
+    fn test_array_object_with_different_indents() {
+        // Test that our indent logic correctly handles different levels
+        let input = r#""config":
+  "servers":
+    - "host": "localhost"
+      "port": 8080
+      "ssl": false
+  "status": "ready""#;
+        let result = parse(input).unwrap();
+        
+        if let Value::Object(obj) = result {
+            if let Some(Value::Object(config)) = obj.get("config") {
+                if let Some(Value::Array(servers)) = config.get("servers") {
+                    assert_eq!(servers.len(), 1);
+                    
+                    // Check first server
+                    if let Some(Value::Object(server1)) = servers.get(0) {
+                        assert_eq!(server1.len(), 3);
+                        assert_eq!(server1.get("host"), Some(&Value::String("localhost".to_string())));
+                        assert_eq!(server1.get("port"), Some(&Value::Number(Number::Integer(8080))));
+                        assert_eq!(server1.get("ssl"), Some(&Value::Bool(false)));
+                    } else {
+                        panic!("First server should be an object");
+                    }
+                } else {
+                    panic!("servers should be an array");
+                }
+                
+                assert_eq!(config.get("status"), Some(&Value::String("ready".to_string())));
+            } else {
+                panic!("config should be an object");
+            }
+        } else {
+            panic!("Root should be an object");
+        }
+    }
+
+    #[test]
+    fn test_array_element_single_key_vs_multiple_keys() {
+        // Ensure single-key objects work correctly alongside multi-key objects
+        let input = r#""items":
+  - "first": "key"
+    "second": "key""#;
+        let result = parse(input).unwrap();
+        
+        if let Value::Object(obj) = result {
+            if let Some(Value::Array(items)) = obj.get("items") {
+                assert_eq!(items.len(), 1);
+                
+                // Multi key object
+                if let Some(Value::Object(item1)) = items.get(0) {
+                    assert_eq!(item1.len(), 2);
+                    assert!(item1.contains_key("first"));
+                    assert!(item1.contains_key("second"));
+                } else {
+                    panic!("Item 1 should be an object");
+                }
+            } else {
+                panic!("items should be an array");
+            }
+        } else {
+            panic!("Root should be an object");
+        }
+    }
+
+    #[test]
+    fn test_array_with_comments() {
+        let input = r#"# Main array
+"tasks":
+  - "name": "Setup"    # Task name
+    "priority": 1      # High priority"#;
+        let result = parse(input).unwrap();
+        
+        if let Value::Object(obj) = result {
+            if let Some(Value::Array(tasks)) = obj.get("tasks") {
+                assert_eq!(tasks.len(), 1);
+                
+                if let Some(Value::Object(task1)) = tasks.get(0) {
+                    assert_eq!(task1.get("name"), Some(&Value::String("Setup".to_string())));
+                    assert_eq!(task1.get("priority"), Some(&Value::Number(Number::Integer(1))));
+                } else {
+                    panic!("Task 1 should be an object");
+                }
+            } else {
+                panic!("tasks should be an array");
+            }
+        } else {
+            panic!("Root should be an object");
+        }
+    }
+
+    #[test]
+    fn test_array_with_literal_strings() {
+        let input = r#""docs":
+  - "title": "Example"
+    "content": "This is a literal string with multiple lines preserved as-is""#;
+        let result = parse(input).unwrap();
+        
+        if let Value::Object(obj) = result {
+            if let Some(Value::Array(docs)) = obj.get("docs") {
+                assert_eq!(docs.len(), 1);
+                
+                // Check literal string
+                if let Some(Value::Object(doc1)) = docs.get(0) {
+                    assert_eq!(doc1.get("title"), Some(&Value::String("Example".to_string())));
+                    if let Some(Value::String(content)) = doc1.get("content") {
+                        assert!(content.contains("multiple lines"));
+                    } else {
+                        panic!("Content should be a string");
+                    }
+                } else {
+                    panic!("Doc 1 should be an object");
+                }
+            } else {
+                panic!("docs should be an array");
+            }
+        } else {
+            panic!("Root should be an object");
+        }
+    }
+
+    #[test]
+    fn test_array_element_edge_cases() {
+        // Test various edge cases for array elements
+        let input = r#""edge_cases":
+  - null
+  - true
+  - false
+  - 0
+  - ""
+  - []
+  - {}
+  - "key": null
+"summary": "complete""#;
+        let result = parse(input).unwrap();
+        
+        if let Value::Object(obj) = result {
+            if let Some(Value::Array(cases)) = obj.get("edge_cases") {
+                assert_eq!(cases.len(), 8);
+                
+                assert_eq!(cases.get(0), Some(&Value::Null));
+                assert_eq!(cases.get(1), Some(&Value::Bool(true)));
+                assert_eq!(cases.get(2), Some(&Value::Bool(false)));
+                assert_eq!(cases.get(3), Some(&Value::Number(Number::Integer(0))));
+                assert_eq!(cases.get(4), Some(&Value::String("".to_string())));
+                
+                // Empty array
+                if let Some(Value::Array(arr)) = cases.get(5) {
+                    assert_eq!(arr.len(), 0);
+                } else {
+                    panic!("Element 5 should be an empty array");
+                }
+                
+                // Empty object
+                if let Some(Value::Object(obj)) = cases.get(6) {
+                    assert_eq!(obj.len(), 0);
+                } else {
+                    panic!("Element 6 should be an empty object");
+                }
+                
+                // Object with null value
+                if let Some(Value::Object(obj)) = cases.get(7) {
+                    assert_eq!(obj.get("key"), Some(&Value::Null));
+                } else {
+                    panic!("Element 7 should be an object");
+                }
+            } else {
+                panic!("edge_cases should be an array");
+            }
+        } else {
+            panic!("Root should be an object");
+        }
+    }
+
+    #[test]
+    fn test_multiple_arrays_in_object() {
+        // Test multiple arrays within the same object
+        let input = r#""users":
+  - "name": "Alice"
+    "role": "admin"
+"active": true"#;
+        let result = parse(input).unwrap();
+        
+        if let Value::Object(obj) = result {
+            assert!(obj.contains_key("users"));
+            assert!(obj.contains_key("active"));
+            
+            // Check users array
+            if let Some(Value::Array(users)) = obj.get("users") {
+                assert_eq!(users.len(), 1);
+                
+                if let Some(Value::Object(user1)) = users.get(0) {
+                    assert_eq!(user1.get("name"), Some(&Value::String("Alice".to_string())));
+                    assert_eq!(user1.get("role"), Some(&Value::String("admin".to_string())));
+                }
+            } else {
+                panic!("users should be an array");
+            }
+        } else {
+            panic!("Root should be an object");
+        }
+    }
+
 }
