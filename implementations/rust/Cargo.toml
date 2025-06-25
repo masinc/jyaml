@@ -1,14 +1,27 @@
-[package]
+[package] 
 name = "jyaml"
-version = "0.1.0"
-edition = "2024"
-authors = ["JYAML Contributors"]
-description = "A Rust implementation of JYAML (JSON-YAML Adaptive Markup Language)"
+version = "0.3.0"
+edition = "2021"
+authors = ["JYAML Contributors <noreply@example.com>"]
+description = "A Rust implementation of JYAML (JSON-YAML Adaptive Markup Language) - JYAML 0.3 compliant parser with trailing comma support"
+documentation = "https://docs.rs/jyaml"
 repository = "https://github.com/masinc/jyaml"
+homepage = "https://github.com/masinc/jyaml"
 license = "MIT OR Apache-2.0"
 keywords = ["jyaml", "json", "yaml", "parser", "serialization"]
 categories = ["parser-implementations", "encoding"]
 readme = "README.md"
+rust-version = "1.70"
+exclude = [
+    "target/",
+    ".git/",
+    "*.log",
+    "examples/debug_tab.rs"
+]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 thiserror = "1.0"
