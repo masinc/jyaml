@@ -88,6 +88,12 @@ impl<'a> Lexer<'a> {
                 self.at_line_start = true;
                 Ok(Token::Newline)
             }
+            Some('\t') => {
+                let line = self.line;
+                let column = self.column;
+                self.advance(); // Important: advance past the tab character
+                Err(Error::TabInIndentation { line, column })
+            }
             Some('#') => self.read_comment(),
             Some('/') => {
                 if self.peek() == Some('/') {
@@ -182,7 +188,7 @@ impl<'a> Lexer<'a> {
     
     fn skip_whitespace(&mut self) {
         while let Some(ch) = self.current {
-            if ch == ' ' || ch == '\t' || ch == '\r' {
+            if ch == ' ' || ch == '\r' {
                 self.advance();
             } else {
                 break;
@@ -199,6 +205,8 @@ impl<'a> Lexer<'a> {
                     self.advance();
                 }
                 '\t' => {
+                    // Tabs are not allowed in JYAML - error immediately
+                    eprintln!("DEBUG: Found tab at line {}, column {}", self.line, self.column);
                     return Err(Error::TabInIndentation {
                         line: self.line,
                         column: self.column,
@@ -573,7 +581,56 @@ mod tests {
         let mut lexer = Lexer::new(input).unwrap();
         
         // Should get an error when trying to parse indentation with tab
-        assert!(lexer.next_token().is_err());
+        let result = lexer.next_token();
+        assert!(result.is_err());
+        
+        // Should be specifically a TabInIndentation error
+        match result.unwrap_err() {
+            Error::TabInIndentation { line, column } => {
+                assert_eq!(line, 1);
+                assert_eq!(column, 1);
+            }
+            _ => panic!("Expected TabInIndentation error"),
+        }
+    }
+
+    #[test]
+    fn test_tab_in_count_indent() {
+        let input = "  \ttest";
+        let mut lexer = Lexer::new(input).unwrap();
+        
+        // Should get an error when encountering tab during indentation counting
+        let result = lexer.next_token();
+        assert!(result.is_err());
+        
+        match result.unwrap_err() {
+            Error::TabInIndentation { line, column } => {
+                assert_eq!(line, 1);
+                assert_eq!(column, 3); // Tab is at the third position
+            }
+            _ => panic!("Expected TabInIndentation error"),
+        }
+    }
+
+    #[test]
+    fn test_tab_anywhere_in_line() {
+        let input = "\"valid\"\ttest";
+        let mut lexer = Lexer::new(input).unwrap();
+        
+        // Skip the first string token
+        lexer.next_token().unwrap();
+        
+        // Should get tab error on the tab character
+        let result = lexer.next_token();
+        assert!(result.is_err());
+        
+        match result.unwrap_err() {
+            Error::TabInIndentation { line, column } => {
+                assert_eq!(line, 1);
+                assert_eq!(column, 8); // Tab is after "valid" (including quotes)
+            }
+            _ => panic!("Expected TabInIndentation error"),
+        }
     }
 
     #[test]

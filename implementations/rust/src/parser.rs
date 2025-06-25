@@ -28,7 +28,7 @@ impl<'a> Parser<'a> {
     }
     
     pub fn parse(&mut self) -> Result<Value> {
-        self.skip_newlines_and_comments();
+        self.skip_newlines_and_comments()?;
         
         let value = self.parse_value()?;
         
@@ -118,18 +118,28 @@ impl<'a> Parser<'a> {
     
     fn parse_flow_array(&mut self) -> Result<Value> {
         self.advance()?; // Skip [
-        self.skip_whitespace_and_comments();
+        self.skip_whitespace_and_comments()?;
         
         let mut array = Vec::new();
         
         while !matches!(self.current_token, Token::RightBracket) {
+            // Skip newlines and indentation in flow context
+            while matches!(self.current_token, Token::Newline | Token::Indent(_)) {
+                self.advance()?;
+            }
+            
+            // Check for closing bracket after skipping whitespace
+            if matches!(self.current_token, Token::RightBracket) {
+                break;
+            }
+            
             array.push(self.parse_value()?);
             
-            self.skip_whitespace_and_comments();
+            self.skip_whitespace_and_comments()?;
             
             if matches!(self.current_token, Token::Comma) {
                 self.advance()?;
-                self.skip_whitespace_and_comments();
+                self.skip_whitespace_and_comments()?;
                 
                 // Allow trailing comma (comma followed by closing bracket)
                 if matches!(self.current_token, Token::RightBracket) {
@@ -146,25 +156,36 @@ impl<'a> Parser<'a> {
     
     fn parse_flow_object(&mut self) -> Result<Value> {
         self.advance()?; // Skip {
-        self.skip_whitespace_and_comments();
+        self.skip_whitespace_and_comments()?;
         
         let mut object = HashMap::new();
         
         while !matches!(self.current_token, Token::RightBrace) {
+            // Skip newlines, indentation, and comments in flow context
+            while matches!(self.current_token, Token::Newline | Token::Indent(_)) {
+                self.advance()?;
+            }
+            self.skip_whitespace_and_comments()?;
+            
+            // Check if we hit closing brace after whitespace/comments
+            if matches!(self.current_token, Token::RightBrace) {
+                break;
+            }
+            
             let key = match &self.current_token {
                 Token::String(s) => s.clone(),
                 _ => return self.error("Expected string key in object"),
             };
             self.advance()?;
             
-            self.skip_whitespace_and_comments();
+            self.skip_whitespace_and_comments()?;
             
             if !matches!(self.current_token, Token::Colon) {
                 return self.error("Expected ':' after object key");
             }
             self.advance()?;
             
-            self.skip_whitespace_and_comments();
+            self.skip_whitespace_and_comments()?;
             
             let value = self.parse_value()?;
             
@@ -178,11 +199,11 @@ impl<'a> Parser<'a> {
             
             object.insert(key, value);
             
-            self.skip_whitespace_and_comments();
+            self.skip_whitespace_and_comments()?;
             
             if matches!(self.current_token, Token::Comma) {
                 self.advance()?;
-                self.skip_whitespace_and_comments();
+                self.skip_whitespace_and_comments()?;
                 
                 // Allow trailing comma (comma followed by closing brace)
                 if matches!(self.current_token, Token::RightBrace) {
@@ -215,9 +236,9 @@ impl<'a> Parser<'a> {
             let element = self.parse_array_element(base_indent)?;
             array.push(element);
             
-            self.skip_newlines_and_comments();
+            self.skip_newlines_and_comments()?;
         } else {
-            self.skip_newlines_and_comments();
+            self.skip_newlines_and_comments()?;
         }
         
         loop {
@@ -281,7 +302,7 @@ impl<'a> Parser<'a> {
             array.push(element);
             
             // Skip trailing whitespace and comments on the same line
-            self.skip_newlines_and_comments();
+            self.skip_newlines_and_comments()?;
         }
         
         Ok(Value::Array(array))
@@ -319,7 +340,7 @@ impl<'a> Parser<'a> {
         // Check if there's a newline after colon (indicates block style value)
         if matches!(self.current_token, Token::Newline) {
             self.advance()?; // Skip newline
-            self.skip_newlines_and_comments();
+            self.skip_newlines_and_comments()?;
             
             // Parse block style value
             let value = self.parse_value()?;
@@ -330,7 +351,7 @@ impl<'a> Parser<'a> {
             object.insert(first_key, value);
         }
         
-        self.skip_newlines_and_comments();
+        self.skip_newlines_and_comments()?;
         
         // Process remaining key-value pairs for this array element
         // The object continues until we hit:
@@ -338,7 +359,7 @@ impl<'a> Parser<'a> {
         // 2. A key at indent 0 (outside the array) 
         // 3. EOF
         loop {
-            self.skip_newlines_and_comments();
+            self.skip_newlines_and_comments()?;
             
             // Skip indent tokens and then check for string
             let current_indent = if let Token::Indent(n) = self.current_token {
@@ -402,7 +423,7 @@ impl<'a> Parser<'a> {
                 // Check if there's a newline after colon (indicates block style value)
                 if matches!(self.current_token, Token::Newline) {
                     self.advance()?; // Skip newline
-                    self.skip_newlines_and_comments();
+                    self.skip_newlines_and_comments()?;
                     
                     // Parse block style value
                     let value = self.parse_value()?;
@@ -431,7 +452,7 @@ impl<'a> Parser<'a> {
                     object.insert(key, value);
                 }
                 
-                self.skip_newlines_and_comments();
+                self.skip_newlines_and_comments()?;
             } else {
                 break;
             }
@@ -450,7 +471,7 @@ impl<'a> Parser<'a> {
         // Check if there's a newline after colon (indicates block style value)
         if matches!(self.current_token, Token::Newline) {
             self.advance()?; // Skip newline
-            self.skip_newlines_and_comments();
+            self.skip_newlines_and_comments()?;
             
             // Parse block style value with indent context
             let current_indent = self.current_indent();
@@ -462,7 +483,7 @@ impl<'a> Parser<'a> {
             object.insert(first_key, value);
         }
         
-        self.skip_newlines_and_comments();
+        self.skip_newlines_and_comments()?;
         
         // The base indentation for keys is 0 (no indentation)
         let base_indent = 0;
@@ -470,7 +491,7 @@ impl<'a> Parser<'a> {
         // Process remaining key-value pairs
         loop {
             // Skip any remaining indentation or newlines first
-            self.skip_newlines_and_comments();
+            self.skip_newlines_and_comments()?;
             
             match &self.current_token {
                 Token::String(key) => {
@@ -495,7 +516,7 @@ impl<'a> Parser<'a> {
                     // Check if there's a newline after colon (indicates block style value)
                     if matches!(self.current_token, Token::Newline) {
                         self.advance()?; // Skip newline
-                        self.skip_newlines_and_comments();
+                        self.skip_newlines_and_comments()?;
                         
                         // Parse block style value
                         let value = self.parse_value()?;
@@ -524,7 +545,7 @@ impl<'a> Parser<'a> {
                         object.insert(key, value);
                     }
                     
-                    self.skip_newlines_and_comments();
+                    self.skip_newlines_and_comments()?;
                 }
                 Token::Eof => break,
                 Token::Newline | Token::Comment(_) => {
@@ -694,21 +715,23 @@ impl<'a> Parser<'a> {
         Ok(self.peek_token.as_ref().unwrap())
     }
     
-    fn skip_whitespace_and_comments(&mut self) {
+    fn skip_whitespace_and_comments(&mut self) -> Result<()> {
         while matches!(self.current_token, Token::Comment(_)) || 
               (matches!(self.current_token, Token::Newline) && self.peek().is_ok()) {
-            let _ = self.advance();
+            self.advance()?;
         }
+        Ok(())
     }
     
     fn skip_inline_whitespace(&mut self) {
         // In JYAML, inline whitespace is handled by the lexer
     }
     
-    fn skip_newlines_and_comments(&mut self) {
+    fn skip_newlines_and_comments(&mut self) -> Result<()> {
         while matches!(self.current_token, Token::Newline | Token::Comment(_)) {
-            let _ = self.advance();
+            self.advance()?;
         }
+        Ok(())
     }
     
     fn current_indent(&self) -> usize {
@@ -917,6 +940,92 @@ mod tests {
         
         // Trailing comma in array is now valid in JYAML 0.3
         assert!(parse("[1, 2,]").is_ok());
+    }
+
+    #[test]
+    fn test_trailing_comma_support() {
+        // Test trailing comma in flow array
+        let result = parse(r#"["first", "second",]"#).unwrap();
+        let expected = Value::Array(vec![
+            Value::String("first".to_string()),
+            Value::String("second".to_string()),
+        ]);
+        assert_eq!(result, expected);
+
+        // Test trailing comma in flow object
+        let result = parse(r#"{"name": "Alice", "age": 30,}"#).unwrap();
+        let mut expected_map = HashMap::new();
+        expected_map.insert("name".to_string(), Value::String("Alice".to_string()));
+        expected_map.insert("age".to_string(), Value::Number(Number::Integer(30)));
+        assert_eq!(result, Value::Object(expected_map));
+
+        // Test empty array with just comma should fail
+        assert!(parse("[,]").is_err());
+
+        // Test empty object with just comma should fail
+        assert!(parse("{,}").is_err());
+
+        // Test multiple trailing commas should fail
+        assert!(parse("[1, 2,,]").is_err());
+        assert!(parse(r#"{"key": "value",,}"#).is_err());
+    }
+
+    #[test]
+    fn test_tab_character_errors() {
+        // Test tab character at beginning of line
+        let input = "\t\"indented\"";
+        let result = parse(input);
+        assert!(result.is_err());
+        
+        match result.unwrap_err() {
+            Error::TabInIndentation { line, column } => {
+                assert_eq!(line, 1);
+                assert_eq!(column, 1);
+            }
+            _ => panic!("Expected TabInIndentation error"),
+        }
+
+        // Test tab character in mixed indentation
+        let input = "\"object\":\n  \"key1\": \"value1\"\n\t\"key2\": \"value2\"";
+        let result = parse(input);
+        assert!(result.is_err());
+        
+        match result.unwrap_err() {
+            Error::TabInIndentation { line, column } => {
+                assert_eq!(line, 3);
+                assert_eq!(column, 1);
+            }
+            _ => panic!("Expected TabInIndentation error"),
+        }
+
+        // Test tab character in the middle of spaces
+        let input = "\"object\":\n  \t\"key\": \"value\"";
+        let result = parse(input);
+        assert!(result.is_err());
+        
+        match result.unwrap_err() {
+            Error::TabInIndentation { line, column } => {
+                assert_eq!(line, 2);
+                assert_eq!(column, 3);
+            }
+            _ => panic!("Expected TabInIndentation error"),
+        }
+    }
+
+    #[test]
+    fn test_error_propagation_from_lexer() {
+        // Test that lexer errors are properly propagated through parser
+        let input = "\"valid\"\t\"invalid\"";
+        let result = parse(input);
+        assert!(result.is_err());
+        
+        // Should get tab error, not a parsing success
+        match result.unwrap_err() {
+            Error::TabInIndentation { .. } => {
+                // This is the expected error type
+            }
+            _ => panic!("Expected TabInIndentation error to be propagated"),
+        }
     }
 
     #[test]
