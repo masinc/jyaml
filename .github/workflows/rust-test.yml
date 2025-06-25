@@ -1,0 +1,112 @@
+name: Rust Test (Reusable)
+
+"on":
+  workflow_call:
+    inputs:
+      rust-version:
+        description: "Rust version to use"
+        required: false
+        default: "stable"
+        type: string
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Test Suite
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ inputs.rust-version }}
+          components: rustfmt, clippy
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: implementations/rust
+          key: test-${{ inputs.rust-version }}
+          shared-key: shared
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build
+        working-directory: implementations/rust
+        run: cargo build --verbose
+
+      - name: Run tests
+        working-directory: implementations/rust
+        run: cargo test --verbose
+
+      - name: Run doctests
+        working-directory: implementations/rust
+        run: cargo test --doc
+
+      - name: Check formatting
+        working-directory: implementations/rust
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy
+        working-directory: implementations/rust
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+  test-suite:
+    name: JYAML Test Suite
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: implementations/rust
+          key: test-suite
+          shared-key: shared
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build test runner
+        working-directory: implementations/rust
+        run: cargo build --example test_file
+
+      - name: Test valid JYAML files
+        working-directory: implementations/rust
+        run: |
+          echo "Testing valid JYAML files..."
+          for file in ../../test-suite/valid/**/*.jyml; do
+            echo "Testing $file"
+            cargo run --example test_file -- "$file"
+          done
+
+      - name: Test invalid JYAML files (should fail)
+        working-directory: implementations/rust
+        run: |
+          echo "Testing invalid JYAML files (expecting failures)..."
+          failed_count=0
+          total_count=0
+          for file in ../../test-suite/invalid/**/*.jyml ../../test-suite/invalid/**/*.jytml; do
+            if [ -f "$file" ]; then
+              echo "Testing $file (should fail)"
+              total_count=$((total_count + 1))
+              if ! cargo run --example test_file -- "$file" 2>/dev/null; then
+                echo "✓ $file correctly failed"
+                failed_count=$((failed_count + 1))
+              else
+                echo "✗ $file should have failed but passed"
+              fi
+            fi
+          done
+          echo "Invalid files test summary: $failed_count/$total_count files correctly failed"
+          if [ $failed_count -eq $total_count ]; then
+            echo "✓ All invalid files correctly failed"
+          else
+            echo "✗ Some invalid files incorrectly passed"
+            exit 1
+          fi

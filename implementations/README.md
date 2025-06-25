@@ -6,10 +6,10 @@ This directory contains core library implementations of the JYAML specification 
 
 | Language | Status | Version | Package |
 |----------|--------|---------|---------|
+| Rust | ✅ Complete | 0.3.0 | jyaml |
 | Python | Planned | - | - |
 | JavaScript/TypeScript | Planned | - | - |
 | Go | Planned | - | - |
-| Rust | Planned | - | - |
 
 ## Implementation Requirements
 
@@ -30,6 +30,51 @@ Each language implementation should follow its language's conventions and best p
 - Source code implementing parser, serializer, and validator
 - Tests including the common test suite
 - Standard package/build configuration for the language
+
+## Rust Implementation
+
+The Rust implementation provides a complete JYAML 0.3 parser with:
+
+- **Full JYAML 0.3 compliance** including trailing comma support
+- **Robust error handling** with clear error messages and position tracking
+- **Tab character detection** and proper error reporting
+- **Comprehensive test suite** covering edge cases and error conditions
+- **Examples** including test file runner with timeout protection
+
+### Key Features
+
+- Parser for converting JYAML text to Rust `Value` enum
+- Lexer with proper UTF-8 validation and position tracking
+- Support for all JYAML data types (null, boolean, number, string, array, object)
+- Flow and block style parsing for arrays and objects
+- Comment support (`#` and `//` styles)
+- Multiline string support (`|` and `>` indicators)
+- Comprehensive error reporting with line/column information
+
+### Usage
+
+```rust
+use jyaml::parse;
+
+let jyaml_text = r#"
+{
+  "name": "Alice",
+  "age": 30,
+}
+"#;
+
+let value = parse(jyaml_text)?;
+println!("{:#?}", value);
+```
+
+### Test Runner
+
+The implementation includes a test runner at `examples/test_file.rs` that can validate any JYAML file:
+
+```bash
+cd implementations/rust
+cargo run --example test_file -- ../../test-suite/valid/basic/hello.jyml
+```
 
 ## JYAML Ecosystem
 
