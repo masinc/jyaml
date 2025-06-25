@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd:*)",
+      "Bash(pwd:*)",
+      "Bash(cat:*)",
+      "Bash(ls:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(cargo test:*)",
+      "Bash(cargo run:*)",
+      "Bash(cargo build:*)",
+      "Bash(cargo check:*)",
+      "Bash(cargo clippy:*)",
+      "WebFetch(https://yaml.org/*)"
+    ],
+    "deny": [
+      "Bash(rustc:*)"
+    ],
+  }
+}
