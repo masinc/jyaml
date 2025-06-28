@@ -1,0 +1,7 @@
+# Clippy configuration for JYAML Rust implementation
+
+# Allow certain patterns in examples and tests
+disallowed-names = []
+
+# Configuration for uninlined_format_args
+# Allow this for examples and tests since they're not production code
