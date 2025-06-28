@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Unit tests for JYAML Pydantic options."""
 
-import pytest
-from decimal import Decimal
 from collections import OrderedDict
+from decimal import Decimal
+
+import pytest
 from pydantic import ValidationError
 
-from jyaml.options import ParseOptions, LoadOptions, JYAMLMode
+from jyaml.options import JYAMLMode, LoadOptions, ParseOptions
 
 
 class TestParseOptions:
@@ -383,7 +384,7 @@ class TestOptionIntegration:
 
     def test_convenience_functions(self):
         """Test convenience functions."""
-        from jyaml import loads_strict, loads_permissive, loads_fast, loads_ordered
+        from jyaml import loads_fast, loads_ordered, loads_permissive, loads_strict
 
         test_data = '{"key": "value", "number": 42}'
 
@@ -442,7 +443,7 @@ class TestOptionErrors:
     def test_field_descriptions(self):
         """Test that all fields have descriptions."""
         # Check ParseOptions
-        for field_name, field_info in ParseOptions.model_fields.items():
+        for _field_name, field_info in ParseOptions.model_fields.items():
             assert hasattr(field_info, "description")
             assert field_info.description is not None
             assert len(field_info.description) > 0

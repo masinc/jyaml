@@ -2,9 +2,10 @@
 
 import json
 from pathlib import Path
+
 import pytest
 
-from jyaml import parse, loads
+from jyaml import loads, parse
 from jyaml.lexer import LexerError
 from jyaml.parser import ParseError
 
@@ -33,7 +34,7 @@ class TestOfficialTestSuite:
             pytest.skip("Valid basic test files directory not found")
 
         for jyaml_file in valid_basic_dir.glob("*.jyml"):
-            with open(jyaml_file, "r", encoding="utf-8") as f:
+            with open(jyaml_file, encoding="utf-8") as f:
                 content = f.read()
 
             try:
@@ -56,7 +57,7 @@ class TestOfficialTestSuite:
             pytest.skip("Valid complex test files directory not found")
 
         for jyaml_file in valid_complex_dir.glob("*.jyml"):
-            with open(jyaml_file, "r", encoding="utf-8") as f:
+            with open(jyaml_file, encoding="utf-8") as f:
                 content = f.read()
 
             try:
@@ -80,7 +81,7 @@ class TestOfficialTestSuite:
             pytest.skip("Valid edge cases test files directory not found")
 
         for jyaml_file in valid_edge_dir.glob("*.jyml"):
-            with open(jyaml_file, "r", encoding="utf-8") as f:
+            with open(jyaml_file, encoding="utf-8") as f:
                 content = f.read()
 
             try:
@@ -121,10 +122,10 @@ class TestOfficialTestSuite:
         failed = 0
 
         for jyaml_file, json_file in test_cases:
-            with open(jyaml_file, "r", encoding="utf-8") as f:
+            with open(jyaml_file, encoding="utf-8") as f:
                 jyaml_content = f.read()
 
-            with open(json_file, "r", encoding="utf-8") as f:
+            with open(json_file, encoding="utf-8") as f:
                 expected_json = json.load(f)
 
             try:
@@ -159,7 +160,7 @@ class TestOfficialTestSuite:
             pytest.skip("Invalid syntax test files directory not found")
 
         for jyaml_file in invalid_syntax_dir.glob("*.jyml"):
-            with open(jyaml_file, "r", encoding="utf-8") as f:
+            with open(jyaml_file, encoding="utf-8") as f:
                 content = f.read()
 
             # Should raise an error
@@ -181,7 +182,7 @@ class TestOfficialTestSuite:
         }  # Not yet implemented
 
         for jyaml_file in invalid_structure_dir.glob("*.jyml"):
-            with open(jyaml_file, "r", encoding="utf-8") as f:
+            with open(jyaml_file, encoding="utf-8") as f:
                 content = f.read()
 
             if jyaml_file.name in expected_failures:
@@ -210,7 +211,7 @@ class TestOfficialTestSuite:
             pytest.skip("Invalid types test files directory not found")
 
         for jyaml_file in invalid_types_dir.glob("*.jyml"):
-            with open(jyaml_file, "r", encoding="utf-8") as f:
+            with open(jyaml_file, encoding="utf-8") as f:
                 content = f.read()
 
             # Should raise an error
@@ -224,7 +225,7 @@ class TestOfficialTestSuite:
         if not multiline_file.exists():
             pytest.skip("Multiline strings test file not found")
 
-        with open(multiline_file, "r", encoding="utf-8") as f:
+        with open(multiline_file, encoding="utf-8") as f:
             content = f.read()
 
         try:
@@ -259,7 +260,7 @@ class TestOfficialTestSuite:
         if not trailing_comma_file.exists():
             pytest.skip("Trailing comma test file not found")
 
-        with open(trailing_comma_file, "r", encoding="utf-8") as f:
+        with open(trailing_comma_file, encoding="utf-8") as f:
             content = f.read()
 
         try:

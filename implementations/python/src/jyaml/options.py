@@ -1,7 +1,9 @@
 """JYAML parsing and dumping options with Pydantic validation."""
 
-from typing import Optional, Callable, Literal
-from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
+from collections.abc import Callable
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 # Predefined option presets for common use cases
@@ -61,7 +63,7 @@ class ParseOptions(BaseModel):
     )
 
     # Performance limits
-    max_depth: Optional[int] = Field(
+    max_depth: int | None = Field(
         default=1000,
         gt=0,
         le=100000,
@@ -151,15 +153,15 @@ class LoadOptions(BaseModel):
     )
 
     # Custom conversion hooks
-    object_hook: Optional[Callable] = Field(
+    object_hook: Callable | None = Field(
         default=None, description="Custom object creation function"
     )
-    number_hook: Optional[Callable] = Field(
+    number_hook: Callable | None = Field(
         default=None, description="Custom number parsing function"
     )
 
     # Include parsing options
-    parse_options: Optional[ParseOptions] = Field(
+    parse_options: ParseOptions | None = Field(
         default=None, description="Override default parse options"
     )
 

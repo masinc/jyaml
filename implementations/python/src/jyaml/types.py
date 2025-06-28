@@ -1,7 +1,8 @@
 """JYAML data types using Pydantic."""
 
-from typing import Any, Dict, List, Union, Optional
-from pydantic import BaseModel, Field, ConfigDict
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class JYAMLValue(BaseModel):
@@ -27,7 +28,7 @@ class JYAMLBool(JYAMLValue):
 class JYAMLNumber(JYAMLValue):
     """JYAML number value."""
 
-    value: Union[int, float]
+    value: int | float
 
 
 class JYAMLString(JYAMLValue):
@@ -39,19 +40,19 @@ class JYAMLString(JYAMLValue):
 class JYAMLArray(JYAMLValue):
     """JYAML array value."""
 
-    value: List["JYAMLData"] = Field(default_factory=list)
+    value: list["JYAMLData"] = Field(default_factory=list)
 
 
 class JYAMLObject(JYAMLValue):
     """JYAML object value."""
 
-    value: Dict[str, "JYAMLData"] = Field(default_factory=dict)
+    value: dict[str, "JYAMLData"] = Field(default_factory=dict)
 
 
 # Union type for all JYAML data types
-JYAMLData = Union[
-    JYAMLNull, JYAMLBool, JYAMLNumber, JYAMLString, JYAMLArray, JYAMLObject
-]
+JYAMLData = (
+    JYAMLNull | JYAMLBool | JYAMLNumber | JYAMLString | JYAMLArray | JYAMLObject
+)
 
 # Update forward references
 JYAMLArray.model_rebuild()
@@ -64,8 +65,8 @@ class ParsedDocument(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     data: JYAMLData
-    comments: List[str] = Field(default_factory=list)
-    source_info: Optional[Dict[str, Any]] = None
+    comments: list[str] = Field(default_factory=list)
+    source_info: dict[str, Any] | None = None
 
 
 def to_python(value: JYAMLData) -> Any:
@@ -92,7 +93,7 @@ def from_python(value: Any) -> JYAMLData:
         return JYAMLNull()
     elif isinstance(value, bool):
         return JYAMLBool(value=value)
-    elif isinstance(value, (int, float)):
+    elif isinstance(value, int | float):
         return JYAMLNumber(value=value)
     elif isinstance(value, str):
         return JYAMLString(value=value)

@@ -1,14 +1,15 @@
 """Tests for JYAML parser."""
 
 import pytest
-from jyaml import parse, loads, ParseError
+
+from jyaml import ParseError, loads, parse
 from jyaml.types import (
-    JYAMLNull,
-    JYAMLBool,
-    JYAMLNumber,
-    JYAMLString,
     JYAMLArray,
+    JYAMLBool,
+    JYAMLNull,
+    JYAMLNumber,
     JYAMLObject,
+    JYAMLString,
 )
 
 

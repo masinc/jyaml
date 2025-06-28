@@ -1,6 +1,7 @@
 """JYAML serialization functionality."""
 
-from typing import Any, Optional, Unpack, TypedDict, Literal
+from typing import Any, Literal, TypedDict, Unpack
+
 from .options import DumpOptions
 
 
@@ -20,8 +21,8 @@ class DumpKwargs(TypedDict, total=False):
 def dumps(
     obj: Any,
     *,
-    preset: Optional[str] = None,
-    options: Optional[DumpOptions] = None,
+    preset: str | None = None,
+    options: DumpOptions | None = None,
     **kwargs: Unpack[DumpKwargs],
 ) -> str:
     """Serialize Python object to JYAML string.
@@ -74,8 +75,8 @@ def dumps(
 
 def _serialize_with_options(obj: Any, options: DumpOptions, depth: int = 0) -> str:
     """Serialize Python object to JYAML with DumpOptions."""
-    from decimal import Decimal
     from collections import OrderedDict
+    from decimal import Decimal
 
     if obj is None:
         return "null"
@@ -83,7 +84,7 @@ def _serialize_with_options(obj: Any, options: DumpOptions, depth: int = 0) -> s
     elif isinstance(obj, bool):
         return "true" if obj else "false"
 
-    elif isinstance(obj, (int, float, Decimal)):
+    elif isinstance(obj, int | float | Decimal):
         return str(obj)
 
     elif isinstance(obj, str):
@@ -92,10 +93,10 @@ def _serialize_with_options(obj: Any, options: DumpOptions, depth: int = 0) -> s
         quote_char = '"' if options.quote_style in ["double", "auto"] else "'"
         return f"{quote_char}{escaped}{quote_char}"
 
-    elif isinstance(obj, (list, tuple)):
+    elif isinstance(obj, list | tuple):
         return _serialize_array(list(obj), options, depth)
 
-    elif isinstance(obj, (dict, OrderedDict)):
+    elif isinstance(obj, dict | OrderedDict):
         return _serialize_object(obj, options, depth)
 
     else:
@@ -172,7 +173,7 @@ def _should_use_block_style_object(obj: dict, depth: int = 0) -> bool:
 
     # Use block style if any value is complex (nested structure)
     for value in obj.values():
-        if isinstance(value, (dict, list)):
+        if isinstance(value, dict | list):
             return True
 
     # Use block style for very long string values

@@ -2,6 +2,7 @@
 """Tests for JSON compatibility with JYAML dumps."""
 
 import json
+
 from jyaml import dumps
 
 

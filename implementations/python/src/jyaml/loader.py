@@ -1,8 +1,10 @@
 """JYAML loader implementation - converts parsed JYAML to Python objects."""
 
-from typing import Any, Optional, Unpack, TypedDict, Callable
-from .parser import parse
+from collections.abc import Callable
+from typing import Any, TypedDict, Unpack
+
 from .options import LoadOptions, ParseOptions
+from .parser import parse
 from .types import JYAMLData
 
 
@@ -16,9 +18,9 @@ class LoadKwargs(TypedDict, total=False):
     parse_null: bool
     use_decimal: bool
     use_ordered_dict: bool
-    object_hook: Optional[Callable]
-    number_hook: Optional[Callable]
-    parse_options: Optional[ParseOptions]
+    object_hook: Callable | None
+    number_hook: Callable | None
+    parse_options: ParseOptions | None
 
 
 def loads_strict(text: str) -> Any:
@@ -46,8 +48,8 @@ def loads_ordered(text: str) -> Any:
 def loads(
     text: str,
     *,
-    preset: Optional[str] = None,
-    options: Optional[LoadOptions] = None,
+    preset: str | None = None,
+    options: LoadOptions | None = None,
     **kwargs: Unpack[LoadKwargs],
 ) -> Any:
     """Parse JYAML text and return native Python data.
@@ -102,16 +104,17 @@ def loads(
 
 def convert_to_python(value: JYAMLData, options: LoadOptions) -> Any:
     """Convert JYAML data to Python with LoadOptions."""
-    from .types import (
-        JYAMLNull,
-        JYAMLBool,
-        JYAMLNumber,
-        JYAMLString,
-        JYAMLArray,
-        JYAMLObject,
-    )
-    from decimal import Decimal
     from collections import OrderedDict
+    from decimal import Decimal
+
+    from .types import (
+        JYAMLArray,
+        JYAMLBool,
+        JYAMLNull,
+        JYAMLNumber,
+        JYAMLObject,
+        JYAMLString,
+    )
 
     if isinstance(value, JYAMLNull):
         return None if options.parse_null else "null"

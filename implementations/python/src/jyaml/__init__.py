@@ -1,22 +1,22 @@
 """JYAML (JSON-YAML Adaptive Markup Language) parser for Python."""
 
-from .parser import parse, Parser, ParseError
-from .loader import loads, loads_strict, loads_permissive, loads_fast, loads_ordered
-from .options import ParseOptions, LoadOptions, DumpOptions, JYAMLMode
 from .dumper import dumps
+from .lexer import Lexer, LexerError, Token, TokenType
+from .loader import loads, loads_fast, loads_ordered, loads_permissive, loads_strict
+from .options import DumpOptions, JYAMLMode, LoadOptions, ParseOptions
+from .parser import ParseError, Parser, parse
 from .types import (
+    JYAMLArray,
+    JYAMLBool,
     JYAMLData,
     JYAMLNull,
-    JYAMLBool,
     JYAMLNumber,
-    JYAMLString,
-    JYAMLArray,
     JYAMLObject,
+    JYAMLString,
     ParsedDocument,
-    to_python,
     from_python,
+    to_python,
 )
-from .lexer import Lexer, Token, TokenType, LexerError
 
 __all__ = [
     "parse",
@@ -51,9 +51,9 @@ __all__ = [
 
 def main():
     """CLI entry point."""
-    import sys
     import argparse
     import json
+    import sys
 
     parser = argparse.ArgumentParser(description="JYAML parser")
     parser.add_argument("file", nargs="?", help="JYAML file to parse")
@@ -64,9 +64,9 @@ def main():
 
     if args.file:
         try:
-            with open(args.file, "r", encoding="utf-8") as f:
+            with open(args.file, encoding="utf-8") as f:
                 content = f.read()
-        except IOError as e:
+        except OSError as e:
             print(f"Error reading file: {e}", file=sys.stderr)
             sys.exit(1)
     else:

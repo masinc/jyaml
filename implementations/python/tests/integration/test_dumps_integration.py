@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Integration tests for JYAML dumps function."""
 
-import pytest
-from decimal import Decimal
 from collections import OrderedDict
+from decimal import Decimal
 
-from jyaml import loads, dumps, DumpOptions
+import pytest
+
+from jyaml import DumpOptions, dumps, loads
 
 
 class TestDumpsIntegration:
@@ -276,7 +277,7 @@ class TestDumpsPerformance:
         """Test serialization of deeply nested structures."""
         # Create 20-level deep nesting
         nested = {"value": "deep"}
-        for i in range(20):
+        for _ in range(20):
             nested = {"level": nested}
 
         jyaml_str = dumps(nested)

@@ -1,13 +1,16 @@
 """Integration tests for JYAML implementation."""
 
 import json
-import tempfile
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
+
 import pytest
 
-from jyaml import parse, loads
+from jyaml import loads, parse
+from jyaml.lexer import LexerError
+from jyaml.parser import ParseError
 
 
 class TestGeneralIntegration:
@@ -66,7 +69,7 @@ class TestGeneralIntegration:
         ]
 
         for invalid_case in invalid_cases:
-            with pytest.raises(Exception):
+            with pytest.raises((ParseError, LexerError)):
                 parse(invalid_case)
 
 

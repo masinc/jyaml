@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Unit tests for JYAML dumps function."""
 
-import pytest
-from decimal import Decimal
 from collections import OrderedDict
+from decimal import Decimal
+
+import pytest
 from pydantic import ValidationError
 
-from jyaml import dumps, loads, DumpOptions
+from jyaml import DumpOptions, dumps, loads
 
 
 class TestDumps:

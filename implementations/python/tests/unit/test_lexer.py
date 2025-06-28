@@ -1,7 +1,8 @@
 """Tests for JYAML lexer."""
 
 import pytest
-from jyaml.lexer import Lexer, TokenType, LexerError
+
+from jyaml.lexer import Lexer, LexerError, TokenType
 
 
 class TestLexer:

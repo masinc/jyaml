@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Integration tests for JYAML options with real parsing scenarios."""
 
-import pytest
-from decimal import Decimal
 from collections import OrderedDict
+from decimal import Decimal
+
+import pytest
 from pydantic import ValidationError
 
-from jyaml import loads, parse, ParseOptions, LoadOptions
+from jyaml import LoadOptions, ParseOptions, loads, parse
 from jyaml.lexer import LexerError
 from jyaml.parser import ParseError
 

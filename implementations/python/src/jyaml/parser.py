@@ -1,16 +1,17 @@
 """JYAML parser implementation."""
 
-from typing import List, Optional, Any, Dict, Unpack, TypedDict, Literal
-from .lexer import Lexer, Token, TokenType, LexerError
+from typing import Any, Literal, TypedDict, Unpack
+
+from .lexer import Lexer, LexerError, Token, TokenType
 from .options import ParseOptions
 from .types import (
+    JYAMLArray,
+    JYAMLBool,
     JYAMLData,
     JYAMLNull,
-    JYAMLBool,
     JYAMLNumber,
-    JYAMLString,
-    JYAMLArray,
     JYAMLObject,
+    JYAMLString,
     ParsedDocument,
 )
 
@@ -20,7 +21,7 @@ class ParseOptionsKwargs(TypedDict, total=False):
     strict_mode: bool
     preserve_comments: bool
     allow_duplicate_keys: bool
-    max_depth: Optional[int]
+    max_depth: int | None
     include_comment_positions: bool
     normalize_line_endings: Literal["none", "lf", "crlf"]
 
@@ -28,21 +29,21 @@ class ParseOptionsKwargs(TypedDict, total=False):
 class ParseError(Exception):
     """Parser error with position information."""
 
-    def __init__(self, message: str, token: Optional[Token] = None):
+    def __init__(self, message: str, token: Token | None = None):
         if token:
             super().__init__(f"{message} at line {token.line}, column {token.column}")
         else:
             super().__init__(message)
-        
-        self.line: Optional[int] = token.line if token else None
-        self.column: Optional[int] = token.column if token else None
+
+        self.line: int | None = token.line if token else None
+        self.column: int | None = token.column if token else None
         self.message = message
 
 
 class Parser:
     """JYAML parser."""
 
-    def __init__(self, text: str, options: Optional[ParseOptions] = None):
+    def __init__(self, text: str, options: ParseOptions | None = None):
         """Initialize parser with input text and options."""
         self.options = options or ParseOptions()
 
@@ -54,10 +55,10 @@ class Parser:
         # "none" - no normalization
 
         self.lexer = Lexer(text)
-        self.tokens: List[Token] = []
+        self.tokens: list[Token] = []
         self.position = 0
-        self.comments: List[str] = []
-        self.comment_positions: List[Dict[str, Any]] = []
+        self.comments: list[str] = []
+        self.comment_positions: list[dict[str, Any]] = []
         self.depth = 0
         self.token_count = 0
 
@@ -90,13 +91,13 @@ class Parser:
                 # In non-strict mode, try to continue parsing other errors
                 pass
 
-    def current_token(self) -> Optional[Token]:
+    def current_token(self) -> Token | None:
         """Get current token."""
         if self.position >= len(self.tokens):
             return None
         return self.tokens[self.position]
 
-    def peek_token(self, offset: int = 1) -> Optional[Token]:
+    def peek_token(self, offset: int = 1) -> Token | None:
         """Peek at token at offset from current position."""
         pos = self.position + offset
         if pos >= len(self.tokens):
@@ -119,7 +120,7 @@ class Parser:
         """Exit current parsing scope."""
         self.depth -= 1
 
-    def advance(self) -> Optional[Token]:
+    def advance(self) -> Token | None:
         """Advance to next token and return current."""
         if self.position >= len(self.tokens):
             return None
@@ -181,7 +182,7 @@ class Parser:
                     float_value = float(token.value)
                     return JYAMLNumber(value=float_value)
             except ValueError:
-                raise ParseError(f"Invalid number: {token.value}", token)
+                raise ParseError(f"Invalid number: {token.value}", token) from None
 
         elif token.type == TokenType.STRING:
             # Check if it's a block object (key without bracket)
@@ -220,7 +221,7 @@ class Parser:
         self.expect(TokenType.LEFT_BRACKET)
         self.skip_newlines()
 
-        items: List[JYAMLData] = []
+        items: list[JYAMLData] = []
 
         # Handle empty array
         current = self.current_token()
@@ -262,7 +263,7 @@ class Parser:
         self.expect(TokenType.LEFT_BRACE)
         self.skip_newlines()
 
-        items: Dict[str, JYAMLData] = {}
+        items: dict[str, JYAMLData] = {}
 
         # Handle empty object
         current = self.current_token()
@@ -319,7 +320,7 @@ class Parser:
     def parse_block_array(self) -> JYAMLArray:
         """Parse block-style array."""
         self.enter_scope()
-        items: List[JYAMLData] = []
+        items: list[JYAMLData] = []
         base_indent = None
 
         while True:
@@ -410,8 +411,8 @@ class Parser:
 def parse(
     text: str,
     *,
-    preset: Optional[str] = None,
-    options: Optional[ParseOptions] = None,
+    preset: str | None = None,
+    options: ParseOptions | None = None,
     **kwargs: Unpack[ParseOptionsKwargs],
 ) -> ParsedDocument:
     """Parse JYAML text and return ParsedDocument.

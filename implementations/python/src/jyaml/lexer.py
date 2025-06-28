@@ -1,7 +1,8 @@
 """JYAML lexer implementation."""
 
+from collections.abc import Iterator
 from enum import Enum
-from typing import Optional, Iterator
+
 from pydantic import BaseModel, Field
 
 
@@ -69,20 +70,20 @@ class Lexer:
         self.column = 1
         self.at_line_start = True
 
-    def current_char(self) -> Optional[str]:
+    def current_char(self) -> str | None:
         """Get current character."""
         if self.position >= len(self.text):
             return None
         return self.text[self.position]
 
-    def peek_char(self, offset: int = 1) -> Optional[str]:
+    def peek_char(self, offset: int = 1) -> str | None:
         """Peek at character at offset from current position."""
         pos = self.position + offset
         if pos >= len(self.text):
             return None
         return self.text[pos]
 
-    def advance(self) -> Optional[str]:
+    def advance(self) -> str | None:
         """Advance to next character and return current."""
         if self.position >= len(self.text):
             return None
