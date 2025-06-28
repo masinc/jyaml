@@ -1,10 +1,7 @@
 //! JYAML serializer implementation
 
-use crate::{
-    error::Result,
-    options::{OutputStyle, QuoteStyle, SerializeOptions},
-    Error,
-};
+use crate::{error::Result, options::SerializeOptions, Error};
+#[allow(unused_imports)]
 use serde::ser::{
     self, Serialize, SerializeMap, SerializeSeq, SerializeStruct, SerializeStructVariant,
     SerializeTuple, SerializeTupleStruct, SerializeTupleVariant,
@@ -48,34 +45,34 @@ pub struct Serializer {
     current_indent: usize,
     is_pretty: bool,
     in_flow: bool,
-    options: SerializeOptions,
+}
+
+impl Default for Serializer {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Serializer {
     /// Create a new serializer with compact output
     pub fn new() -> Self {
-        let options = SerializeOptions::compact();
         Serializer {
             output: String::new(),
-            indent_size: options.indent,
+            indent_size: 0,
             current_indent: 0,
-            is_pretty: options.pretty,
+            is_pretty: false,
             in_flow: false,
-            options,
         }
     }
 
     /// Create a new serializer with pretty-printed output
     pub fn pretty(indent_size: usize) -> Self {
-        let mut options = SerializeOptions::pretty();
-        options.indent = indent_size;
         Serializer {
             output: String::new(),
             indent_size,
             current_indent: 0,
             is_pretty: true,
             in_flow: false,
-            options,
         }
     }
 
@@ -87,7 +84,6 @@ impl Serializer {
             current_indent: 0,
             is_pretty: options.pretty,
             in_flow: false,
-            options,
         }
     }
 
@@ -127,7 +123,7 @@ impl Serializer {
     }
 }
 
-impl<'a> ser::Serializer for &'a mut Serializer {
+impl ser::Serializer for &mut Serializer {
     type Ok = ();
     type Error = Error;
 
@@ -338,7 +334,7 @@ impl<'a> ser::Serializer for &'a mut Serializer {
 }
 
 // Implement serialization for sequences
-impl<'a> ser::SerializeSeq for &'a mut Serializer {
+impl ser::SerializeSeq for &mut Serializer {
     type Ok = ();
     type Error = Error;
 
@@ -372,7 +368,7 @@ impl<'a> ser::SerializeSeq for &'a mut Serializer {
 }
 
 // Forward tuple serialization to sequence
-impl<'a> ser::SerializeTuple for &'a mut Serializer {
+impl ser::SerializeTuple for &mut Serializer {
     type Ok = ();
     type Error = Error;
 
@@ -388,7 +384,7 @@ impl<'a> ser::SerializeTuple for &'a mut Serializer {
     }
 }
 
-impl<'a> ser::SerializeTupleStruct for &'a mut Serializer {
+impl ser::SerializeTupleStruct for &mut Serializer {
     type Ok = ();
     type Error = Error;
 
@@ -404,7 +400,7 @@ impl<'a> ser::SerializeTupleStruct for &'a mut Serializer {
     }
 }
 
-impl<'a> ser::SerializeTupleVariant for &'a mut Serializer {
+impl ser::SerializeTupleVariant for &mut Serializer {
     type Ok = ();
     type Error = Error;
 
@@ -421,7 +417,7 @@ impl<'a> ser::SerializeTupleVariant for &'a mut Serializer {
 }
 
 // Implement serialization for maps
-impl<'a> ser::SerializeMap for &'a mut Serializer {
+impl ser::SerializeMap for &mut Serializer {
     type Ok = ();
     type Error = Error;
 
@@ -461,7 +457,7 @@ impl<'a> ser::SerializeMap for &'a mut Serializer {
     }
 }
 
-impl<'a> ser::SerializeStruct for &'a mut Serializer {
+impl ser::SerializeStruct for &mut Serializer {
     type Ok = ();
     type Error = Error;
 
@@ -477,7 +473,7 @@ impl<'a> ser::SerializeStruct for &'a mut Serializer {
     }
 }
 
-impl<'a> ser::SerializeStructVariant for &'a mut Serializer {
+impl ser::SerializeStructVariant for &mut Serializer {
     type Ok = ();
     type Error = Error;
 

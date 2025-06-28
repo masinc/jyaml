@@ -28,6 +28,7 @@ pub struct Deserializer {
 
 impl Deserializer {
     /// Create a new deserializer from a JYAML string
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Result<Self> {
         Self::from_str_with_options(s, &DeserializeOptions::default())
     }

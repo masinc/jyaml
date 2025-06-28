@@ -49,7 +49,6 @@
 
 use crate::{Error, Result};
 
-#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 /// Output style for JYAML serialization
@@ -79,8 +78,8 @@ use serde::{Deserialize, Serialize};
 /// // "name": "Alice"
 /// // "age": "30"
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Serialize, Deserialize)]
 pub enum OutputStyle {
     /// Compact JSON-like format with minimal whitespace
     ///
@@ -96,14 +95,10 @@ pub enum OutputStyle {
     ///
     /// Uses Flow for simple/small structures and Block for complex/large ones.
     /// Provides a good balance between readability and compactness.
+    #[default]
     Auto,
 }
 
-impl Default for OutputStyle {
-    fn default() -> Self {
-        OutputStyle::Auto
-    }
-}
 
 /// Quote style for string values
 ///
@@ -125,12 +120,13 @@ impl Default for OutputStyle {
 /// let single_opts = SerializeOptions::builder().quote_style(QuoteStyle::Single).build();
 /// // Would output: 'Hello World' (if implemented)
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Serialize, Deserialize)]
 pub enum QuoteStyle {
     /// Always use double quotes (`"`)
     ///
     /// Standard JSON-compatible quoting. Recommended for interoperability.
+    #[default]
     Double,
     /// Always use single quotes (`'`)
     ///
@@ -144,11 +140,6 @@ pub enum QuoteStyle {
     Auto,
 }
 
-impl Default for QuoteStyle {
-    fn default() -> Self {
-        QuoteStyle::Double
-    }
-}
 
 /// Line ending style for serialized output
 ///
@@ -180,13 +171,14 @@ impl Default for QuoteStyle {
 ///     .pretty(true)
 ///     .build();
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Serialize, Deserialize)]
 pub enum LineEnding {
     /// No normalization - preserve original line endings
     ///
     /// This is the safest option as it doesn't modify the data unexpectedly.
     /// Recommended for most use cases.
+    #[default]
     None,
     /// Unix-style LF (`\n`)
     ///
@@ -200,11 +192,6 @@ pub enum LineEnding {
     Crlf,
 }
 
-impl Default for LineEnding {
-    fn default() -> Self {
-        LineEnding::None
-    }
-}
 
 /// Options for deserializing JYAML from text
 ///
@@ -241,7 +228,7 @@ impl Default for LineEnding {
 /// - [`fast()`](DeserializeOptions::fast) - Fast parsing with minimal features
 /// - [`debug()`](DeserializeOptions::debug) - Debug mode with maximum information
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Serialize, Deserialize)]
 pub struct DeserializeOptions {
     /// Enable strict mode parsing
     ///
@@ -375,7 +362,7 @@ impl Default for DeserializeOptions {
 /// - [`block()`](SerializeOptions::block) - YAML-style block format
 /// - [`json_compatible()`](SerializeOptions::json_compatible) - JSON-compatible output
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Serialize, Deserialize)]
 pub struct SerializeOptions {
     /// Output style (flow, block, or auto)
     ///

@@ -12,7 +12,6 @@ pub struct Parser<'a> {
     lexer: Lexer<'a>,
     current_token: Token,
     peek_token: Option<Token>,
-    indent_stack: Vec<usize>,
     options: DeserializeOptions,
     depth: usize,
 }
@@ -30,7 +29,6 @@ impl<'a> Parser<'a> {
             lexer,
             current_token,
             peek_token: None,
-            indent_stack: vec![0],
             options: options.clone(),
             depth: 0,
         })
@@ -209,16 +207,14 @@ impl<'a> Parser<'a> {
 
             let value = self.parse_value()?;
 
-            if object.contains_key(&key) {
-                if !self.options.allow_duplicate_keys {
-                    return Err(Error::DuplicateKey {
-                        line: self.lexer.current_position().0,
-                        column: self.lexer.current_position().1,
-                        key,
-                    });
-                }
-                // If duplicates are allowed, the last value wins (default HashMap behavior)
+            if object.contains_key(&key) && !self.options.allow_duplicate_keys {
+                return Err(Error::DuplicateKey {
+                    line: self.lexer.current_position().0,
+                    column: self.lexer.current_position().1,
+                    key,
+                });
             }
+            // If duplicates are allowed, the last value wins (default HashMap behavior)
 
             object.insert(key, value);
 
@@ -460,14 +456,12 @@ impl<'a> Parser<'a> {
                     // Parse block style value
                     let value = self.parse_value()?;
 
-                    if object.contains_key(&key) {
-                        if !self.options.allow_duplicate_keys {
-                            return Err(Error::DuplicateKey {
-                                line: self.lexer.current_position().0,
-                                column: self.lexer.current_position().1,
-                                key,
-                            });
-                        }
+                    if object.contains_key(&key) && !self.options.allow_duplicate_keys {
+                        return Err(Error::DuplicateKey {
+                            line: self.lexer.current_position().0,
+                            column: self.lexer.current_position().1,
+                            key,
+                        });
                     }
 
                     object.insert(key, value);
@@ -475,14 +469,12 @@ impl<'a> Parser<'a> {
                     // Parse inline value
                     let value = self.parse_value()?;
 
-                    if object.contains_key(&key) {
-                        if !self.options.allow_duplicate_keys {
-                            return Err(Error::DuplicateKey {
-                                line: self.lexer.current_position().0,
-                                column: self.lexer.current_position().1,
-                                key,
-                            });
-                        }
+                    if object.contains_key(&key) && !self.options.allow_duplicate_keys {
+                        return Err(Error::DuplicateKey {
+                            line: self.lexer.current_position().0,
+                            column: self.lexer.current_position().1,
+                            key,
+                        });
                     }
 
                     object.insert(key, value);
@@ -572,14 +564,12 @@ impl<'a> Parser<'a> {
                         // Parse block style value
                         let value = self.parse_value()?;
 
-                        if object.contains_key(&key) {
-                            if !self.options.allow_duplicate_keys {
-                                return Err(Error::DuplicateKey {
-                                    line: self.lexer.current_position().0,
-                                    column: self.lexer.current_position().1,
-                                    key,
-                                });
-                            }
+                        if object.contains_key(&key) && !self.options.allow_duplicate_keys {
+                            return Err(Error::DuplicateKey {
+                                line: self.lexer.current_position().0,
+                                column: self.lexer.current_position().1,
+                                key,
+                            });
                         }
 
                         object.insert(key, value);
@@ -587,14 +577,12 @@ impl<'a> Parser<'a> {
                         // Parse inline value
                         let value = self.parse_value()?;
 
-                        if object.contains_key(&key) {
-                            if !self.options.allow_duplicate_keys {
-                                return Err(Error::DuplicateKey {
-                                    line: self.lexer.current_position().0,
-                                    column: self.lexer.current_position().1,
-                                    key,
-                                });
-                            }
+                        if object.contains_key(&key) && !self.options.allow_duplicate_keys {
+                            return Err(Error::DuplicateKey {
+                                line: self.lexer.current_position().0,
+                                column: self.lexer.current_position().1,
+                                key,
+                            });
                         }
 
                         object.insert(key, value);

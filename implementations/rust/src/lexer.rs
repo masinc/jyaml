@@ -37,7 +37,6 @@ pub enum Token {
     Newline,
     Indent(usize),
     Comment(String),
-    RawText(String), // For literal/folded string content
     Eof,
 }
 
@@ -537,75 +536,12 @@ impl<'a> Lexer<'a> {
         (self.line, self.column)
     }
 
-    /// Read a line of raw content for literal strings, without tokenizing
-    pub fn read_raw_line(&mut self) -> String {
-        let mut content = String::new();
-        while let Some(ch) = self.current {
-            if ch == '\n' {
-                break;
-            }
-            content.push(ch);
-            self.advance();
-        }
-        content
-    }
 
-    /// Read raw content until end of line or EOF, then force advance past newline
-    pub fn read_and_consume_line(&mut self) -> String {
-        let content = self.read_raw_line();
-        // Skip newline if present
-        if self.current == Some('\n') {
-            self.advance();
-            self.at_line_start = true;
-        }
-        content
-    }
 
-    /// Skip to next line and get the next meaningful token
-    /// Used for multiline string processing to avoid tokenizing content
-    pub fn skip_to_next_line_and_get_token(&mut self) -> Result<Token> {
-        // Skip to end of current line
-        while let Some(ch) = self.current {
-            if ch == '\n' {
-                self.advance();
-                self.at_line_start = true;
-                break;
-            }
-            self.advance();
-        }
 
-        // Now get the next token normally
-        self.next_token()
-    }
 
-    /// Get current position in input for direct reading
-    pub fn current_input_position(&self) -> usize {
-        self.position
-    }
 
-    /// Get input slice from current position to end
-    pub fn remaining_input(&self) -> &str {
-        &self.input[self.position..]
-    }
 
-    /// Advance position by n characters and update lexer state
-    pub fn advance_by(&mut self, n: usize) {
-        for _ in 0..n {
-            if self.current.is_some() {
-                self.advance();
-            }
-        }
-    }
-
-    /// Skip to the end of current line
-    pub fn skip_to_line_end(&mut self) {
-        while let Some(ch) = self.current {
-            if ch == '\n' {
-                break;
-            }
-            self.advance();
-        }
-    }
 
     /// Read multiline literal string content starting at a specific indent level
     /// When this is called, lexer should be positioned at the first content character
