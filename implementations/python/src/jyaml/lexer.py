@@ -154,7 +154,22 @@ class Lexer:
                             raise LexerError("Invalid unicode escape", self.line, self.column)
                         hex_digits += digit
                         self.advance()
-                    value += chr(int(hex_digits, 16))
+                    
+                    code_point = int(hex_digits, 16)
+                    
+                    # Check if this is a high surrogate (D800-DBFF)
+                    if 0xD800 <= code_point <= 0xDBFF:
+                        # This is a high surrogate, we need to read the low surrogate
+                        low_surrogate = self._read_low_surrogate()
+                        # Convert surrogate pair to Unicode code point
+                        combined_code_point = 0x10000 + ((code_point - 0xD800) << 10) + (low_surrogate - 0xDC00)
+                        value += chr(combined_code_point)
+                    elif 0xDC00 <= code_point <= 0xDFFF:
+                        # This is a low surrogate without a high surrogate
+                        raise LexerError(f"Unexpected low surrogate U+{code_point:04X}", self.line, self.column)
+                    else:
+                        # Regular Unicode character
+                        value += chr(code_point)
                     continue
                 else:
                     raise LexerError(f"Invalid escape sequence: \\{escaped}", self.line, self.column)
@@ -280,6 +295,34 @@ class Lexer:
                 value += self.advance()
         
         return value
+    
+    def _read_low_surrogate(self) -> int:
+        """Read the low surrogate part of a surrogate pair."""
+        # Expect "\u" for the low surrogate
+        if self.current_char() != '\\':
+            raise LexerError("Expected '\\' for low surrogate", self.line, self.column)
+        self.advance()
+        
+        if self.current_char() != 'u':
+            raise LexerError("Expected 'u' for low surrogate", self.line, self.column)
+        self.advance()
+        
+        # Read the low surrogate hex digits
+        hex_digits = ""
+        for _ in range(4):
+            digit = self.current_char()
+            if digit is None or digit not in '0123456789abcdefABCDEF':
+                raise LexerError("Invalid unicode escape in low surrogate", self.line, self.column)
+            hex_digits += digit
+            self.advance()
+        
+        low_code = int(hex_digits, 16)
+        
+        # Validate that it's actually a low surrogate
+        if not (0xDC00 <= low_code <= 0xDFFF):
+            raise LexerError(f"Expected low surrogate (DC00-DFFF), got U+{low_code:04X}", self.line, self.column)
+        
+        return low_code
     
     def read_comment(self) -> str:
         """Read comment."""
