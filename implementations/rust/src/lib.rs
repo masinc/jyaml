@@ -129,6 +129,7 @@ pub mod value;
 
 mod lexer;
 mod parser;
+mod test_multiline;
 
 // Core deserialization functions and types
 pub use de::{from_str, from_str_with_options, Deserializer};

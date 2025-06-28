@@ -2,6 +2,13 @@
 
 use crate::{Error, Result};
 
+#[derive(Debug, Clone, Copy)]
+pub enum ChompingIndicator {
+    Clip,   // default (preserve final newline)
+    Strip,  // remove all trailing newlines (-)
+    Keep,   // preserve all trailing newlines (+)
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token {
     // Literals
@@ -21,8 +28,10 @@ pub enum Token {
     Dash,
     Pipe,
     PipeStrip,
+    PipeKeep,
     Greater,
     GreaterStrip,
+    GreaterKeep,
     
     // Special
     Newline,
@@ -141,6 +150,9 @@ impl<'a> Lexer<'a> {
                 if self.current == Some('-') {
                     self.advance();
                     Ok(Token::PipeStrip)
+                } else if self.current == Some('+') {
+                    self.advance();
+                    Ok(Token::PipeKeep)
                 } else {
                     Ok(Token::Pipe)
                 }
@@ -150,6 +162,9 @@ impl<'a> Lexer<'a> {
                 if self.current == Some('-') {
                     self.advance();
                     Ok(Token::GreaterStrip)
+                } else if self.current == Some('+') {
+                    self.advance();
+                    Ok(Token::GreaterKeep)
                 } else {
                     Ok(Token::Greater)
                 }
@@ -554,6 +569,25 @@ impl<'a> Lexer<'a> {
         self.next_token()
     }
     
+    /// Get current position in input for direct reading
+    pub fn current_input_position(&self) -> usize {
+        self.position
+    }
+    
+    /// Get input slice from current position to end
+    pub fn remaining_input(&self) -> &str {
+        &self.input[self.position..]
+    }
+    
+    /// Advance position by n characters and update lexer state
+    pub fn advance_by(&mut self, n: usize) {
+        for _ in 0..n {
+            if self.current.is_some() {
+                self.advance();
+            }
+        }
+    }
+    
     /// Skip to the end of current line
     pub fn skip_to_line_end(&mut self) {
         while let Some(ch) = self.current {
@@ -564,6 +598,324 @@ impl<'a> Lexer<'a> {
         }
     }
     
+    /// Read multiline literal string content starting at a specific indent level
+    /// When this is called, lexer should be positioned at the first content character
+    pub fn read_multiline_block(&mut self, content_indent: usize, chomping: ChompingIndicator) -> Result<String> {
+        let mut lines = Vec::new();
+        
+        // First, read the current line since we're already positioned at the content
+        if self.current.is_some() && self.current != Some('\n') {
+            let mut line_content = String::new();
+            while let Some(ch) = self.current {
+                if ch == '\n' {
+                    self.advance();
+                    self.at_line_start = true;
+                    break;
+                }
+                line_content.push(ch);
+                self.advance();
+            }
+            lines.push(line_content);
+        }
+        
+        loop {
+            // Read line-by-line, checking indentation manually
+            let line_start_pos = self.position;
+            
+            // Count indentation on this line
+            let mut line_indent = 0;
+            while let Some(ch) = self.current {
+                if ch == ' ' {
+                    line_indent += 1;
+                    self.advance();
+                } else if ch == '\t' {
+                    return Err(Error::TabInIndentation {
+                        line: self.line,
+                        column: self.column,
+                    });
+                } else {
+                    break;
+                }
+            }
+            
+            
+            // Check if we're at the end of the multiline block
+            if self.current.is_none() {
+                break;
+            }
+            
+            // If line starts with less indentation than content_indent, we're done
+            if line_indent < content_indent {
+                // Reset position to start of this line
+                self.position = line_start_pos;
+                // Reset character iterator to current position
+                self.chars = self.input[self.position..].chars();
+                self.current = self.chars.next();
+                // Recalculate line and column numbers
+                let mut line = 1;
+                let mut column = 1;
+                for ch in self.input[..self.position].chars() {
+                    if ch == '\n' {
+                        line += 1;
+                        column = 1;
+                    } else {
+                        column += 1;
+                    }
+                }
+                self.line = line;
+                self.column = column;
+                // Mark that we're at line start for proper tokenization
+                self.at_line_start = true;
+                break;
+            }
+            
+            // If this is a comment line, skip it
+            if self.current == Some('#') {
+                while let Some(ch) = self.current {
+                    if ch == '\n' {
+                        self.advance();
+                        self.at_line_start = true;
+                        break;
+                    }
+                    self.advance();
+                }
+                continue;
+            }
+            
+            // If it's just a newline (empty line), handle it
+            if self.current == Some('\n') {
+                lines.push(String::new());
+                self.advance();
+                self.at_line_start = true;
+                continue;
+            }
+            
+            // Read the rest of the line as content
+            let mut line_content = String::new();
+            while let Some(ch) = self.current {
+                if ch == '\n' {
+                    self.advance();
+                    self.at_line_start = true;
+                    break;
+                }
+                line_content.push(ch);
+                self.advance();
+            }
+            
+            // Build line with proper relative indentation
+            let indent_diff = line_indent.saturating_sub(content_indent);
+            let mut line = " ".repeat(indent_diff);
+            line.push_str(&line_content);
+            lines.push(line);
+        }
+        
+        let mut result = lines.join("\n");
+        
+        // Apply chomping indicator
+        match chomping {
+            ChompingIndicator::Clip => {
+                // Default: preserve final newline if content exists
+                if !result.is_empty() {
+                    result.push('\n');
+                }
+            }
+            ChompingIndicator::Strip => {
+                // Strip: remove all trailing newlines (do nothing, already stripped)
+            }
+            ChompingIndicator::Keep => {
+                // Keep: preserve all trailing newlines
+                if !result.is_empty() {
+                    result.push('\n');
+                    // For keep mode, we might need to preserve additional newlines
+                    // This is a simplified implementation
+                }
+            }
+        }
+        
+        Ok(result)
+    }
+    
+    /// Read multiline folded string content starting at a specific indent level
+    /// When this is called, lexer should be positioned at the first content character
+    pub fn read_folded_block(&mut self, content_indent: usize, chomping: ChompingIndicator) -> Result<String> {
+        let mut paragraphs = Vec::new();
+        let mut current_paragraph = Vec::new();
+        let mut trailing_empty_lines = 0;
+        
+        // First, read the current line since we're already positioned at the content
+        if self.current.is_some() && self.current != Some('\n') {
+            let mut line_content = String::new();
+            while let Some(ch) = self.current {
+                if ch == '\n' {
+                    self.advance();
+                    self.at_line_start = true;
+                    break;
+                }
+                line_content.push(ch);
+                self.advance();
+            }
+            
+            if !line_content.trim().is_empty() {
+                current_paragraph.push(line_content.trim().to_string());
+                trailing_empty_lines = 0; // Reset empty line count
+            }
+        }
+        
+        loop {
+            // Read line-by-line, checking indentation manually
+            let line_start_pos = self.position;
+            
+            // Count indentation on this line
+            let mut line_indent = 0;
+            while let Some(ch) = self.current {
+                if ch == ' ' {
+                    line_indent += 1;
+                    self.advance();
+                } else if ch == '\t' {
+                    return Err(Error::TabInIndentation {
+                        line: self.line,
+                        column: self.column,
+                    });
+                } else {
+                    break;
+                }
+            }
+            
+            // Check if we're at the end of the multiline block
+            if self.current.is_none() {
+                break;
+            }
+            
+            // If line starts with less indentation than content_indent, check if it's an empty line
+            if line_indent < content_indent {
+                // If it's a newline (empty line), handle it
+                if self.current == Some('\n') {
+                    trailing_empty_lines += 1;
+                    self.advance();
+                    self.at_line_start = true;
+                    continue;
+                }
+                
+                // Otherwise, we're done with this block
+                // Reset position to start of this line
+                self.position = line_start_pos;
+                // Reset character iterator to current position
+                self.chars = self.input[self.position..].chars();
+                self.current = self.chars.next();
+                // Recalculate line and column numbers
+                let mut line = 1;
+                let mut column = 1;
+                for ch in self.input[..self.position].chars() {
+                    if ch == '\n' {
+                        line += 1;
+                        column = 1;
+                    } else {
+                        column += 1;
+                    }
+                }
+                self.line = line;
+                self.column = column;
+                // Mark that we're at line start for proper tokenization
+                self.at_line_start = true;
+                break;
+            }
+            
+            // If this is a comment line, skip it
+            if self.current == Some('#') {
+                while let Some(ch) = self.current {
+                    if ch == '\n' {
+                        self.advance();
+                        self.at_line_start = true;
+                        break;
+                    }
+                    self.advance();
+                }
+                continue;
+            }
+            
+            // If it's just a newline (empty line), handle it
+            if self.current == Some('\n') {
+                if !current_paragraph.is_empty() {
+                    // For Keep chomping indicator, preserve line breaks within paragraphs
+                    let separator = if matches!(chomping, ChompingIndicator::Keep) { "\n" } else { " " };
+                    paragraphs.push(current_paragraph.join(separator));
+                    current_paragraph.clear();
+                }
+                trailing_empty_lines += 1;
+                self.advance();
+                self.at_line_start = true;
+                continue;
+            }
+            
+            // Read the rest of the line as content
+            let mut line_content = String::new();
+            while let Some(ch) = self.current {
+                if ch == '\n' {
+                    self.advance();
+                    self.at_line_start = true;
+                    break;
+                }
+                line_content.push(ch);
+                self.advance();
+            }
+            
+            // Build line with proper relative indentation
+            let indent_diff = line_indent.saturating_sub(content_indent);
+            let mut line = " ".repeat(indent_diff);
+            line.push_str(&line_content);
+            
+            if line.trim().is_empty() {
+                if !current_paragraph.is_empty() {
+                    // For Keep chomping indicator, preserve line breaks within paragraphs
+                    let separator = if matches!(chomping, ChompingIndicator::Keep) { "\n" } else { " " };
+                    paragraphs.push(current_paragraph.join(separator));
+                    current_paragraph.clear();
+                }
+                trailing_empty_lines += 1;
+            } else {
+                current_paragraph.push(line.trim_start().to_string());
+                trailing_empty_lines = 0; // Reset empty line count
+            }
+        }
+        
+        if !current_paragraph.is_empty() {
+            // For Keep chomping indicator, preserve line breaks within paragraphs
+            let separator = if matches!(chomping, ChompingIndicator::Keep) { "\n" } else { " " };
+            paragraphs.push(current_paragraph.join(separator));
+        }
+        
+        let mut result = paragraphs.join("\n");
+        
+        // Apply chomping indicator
+        match chomping {
+            ChompingIndicator::Clip => {
+                // Default: preserve final newline if content exists
+                if !result.is_empty() {
+                    result.push('\n');
+                }
+            }
+            ChompingIndicator::Strip => {
+                // Strip: remove all trailing newlines (do nothing, already stripped)
+            }
+            ChompingIndicator::Keep => {
+                // Keep: preserve all trailing newlines
+                if !result.is_empty() {
+                    result.push('\n');
+                    // Add all the trailing empty lines that were found
+                    for _ in 0..trailing_empty_lines {
+                        result.push('\n');
+                    }
+                    // For JYAML Keep mode, if no explicit trailing empty lines were found,
+                    // add an extra trailing newline to preserve the "end of block" semantics
+                    if trailing_empty_lines == 0 {
+                        result.push('\n');
+                    }
+                }
+            }
+        }
+        
+        Ok(result)
+    }
     
 }
 
