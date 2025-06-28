@@ -1,4 +1,4 @@
-# JYAML Specification Version 0.3
+# JYAML Specification Version 0.4
 
 ## Overview
 
@@ -218,7 +218,8 @@ Strings in JYAML follow JSON rules:
 - Control characters (U+0000 through U+001F) must be escaped
 - Valid escapes for control characters:
   - `\b`, `\f`, `\n`, `\r`, `\t` for common controls
-  - `\uXXXX` for any Unicode character including other controls
+  - `\uXXXX` for Unicode characters (BMP) including other controls
+  - `\uXXXX\uXXXX` surrogate pairs for characters outside BMP
 
 Examples:
 ```
@@ -254,7 +255,15 @@ Double-quoted strings follow JSON escape rules. All escape sequences in the tabl
 | `\t`                 | Tab             |
 | `\uXXXX`             | Unicode         |
 
-`\uXXXX` can represent any Unicode character by specifying a 4-digit hexadecimal value for `XXXX`.
+`\uXXXX` can represent Unicode characters in the Basic Multilingual Plane (BMP) by specifying a 4-digit hexadecimal value for `XXXX` (U+0000 to U+FFFF).
+
+For Unicode characters outside the BMP (U+10000 to U+10FFFF), such as emoji, use UTF-16 surrogate pairs consisting of two `\uXXXX` sequences following JSON's encoding standard.
+
+**Surrogate Pair Encoding:**
+- Characters U+10000 to U+10FFFF require surrogate pairs
+- High surrogate: `\uD800` to `\uDBFF` (first `\uXXXX`)
+- Low surrogate: `\uDC00` to `\uDFFF` (second `\uXXXX`)
+- Example: 🚀 (U+1F680) becomes `\uD83D\uDE80`
 
 #### Single-quoted strings
 
@@ -269,7 +278,8 @@ Examples:
 # Double quotes - full escaping
 "Hello\nWorld"        # Hello<newline>World
 "Path: \"C:\\temp\""  # Path: "C:\temp"
-"Unicode: \u00A9"     # Unicode: ©
+"Unicode: \u00A9"     # Unicode: © (BMP character)
+"Emoji: \uD83D\uDE80" # Unicode: 🚀 (surrogate pair for U+1F680)
 "It's fine"          # It's fine
 
 # Single quotes - limited escaping
@@ -279,7 +289,10 @@ Examples:
 'Unicode: \u00A9'     # Unicode: \u00A9 (literal)
 ```
 
-Note: This differs from YAML, where single quotes are escaped by doubling them (`''`). JYAML uses backslash escaping for consistency with JSON and common programming languages.
+**Note:** 
+- Unicode escaping follows JSON standard (RFC 7159) for maximum compatibility
+- This differs from YAML, where single quotes are escaped by doubling them (`''`)
+- JYAML uses backslash escaping for consistency with JSON and common programming languages
 
 
 ### Multi-line strings
