@@ -1,18 +1,19 @@
 """JYAML (JSON-YAML Adaptive Markup Language) parser for Python."""
 
 from .parser import (
-    parse, loads, ParseOptions, LoadOptions, JYAMLMode,
+    parse, loads, Parser, ParseError,
     loads_strict, loads_permissive, loads_fast, loads_ordered
 )
+from .options import ParseOptions, LoadOptions, DumpOptions, JYAMLMode
+from .dumper import dumps
 from .types import (
     JYAMLData, JYAMLNull, JYAMLBool, JYAMLNumber, JYAMLString,
     JYAMLArray, JYAMLObject, ParsedDocument, to_python, from_python
 )
 from .lexer import Lexer, Token, TokenType, LexerError
-from .parser import Parser, ParseError
 
 __all__ = [
-    "parse", "loads", "ParseOptions", "LoadOptions", "JYAMLMode",
+    "parse", "loads", "dumps", "ParseOptions", "LoadOptions", "DumpOptions", "JYAMLMode",
     "loads_strict", "loads_permissive", "loads_fast", "loads_ordered",
     "JYAMLData", "JYAMLNull", "JYAMLBool", "JYAMLNumber", "JYAMLString",
     "JYAMLArray", "JYAMLObject", "ParsedDocument", "to_python", "from_python",

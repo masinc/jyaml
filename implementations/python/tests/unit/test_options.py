@@ -6,7 +6,7 @@ from decimal import Decimal
 from collections import OrderedDict
 from pydantic import ValidationError
 
-from jyaml.parser import ParseOptions, LoadOptions, JYAMLMode
+from jyaml.options import ParseOptions, LoadOptions, JYAMLMode
 
 
 class TestParseOptions:

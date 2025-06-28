@@ -66,19 +66,17 @@ class TestParseOptionsIntegration:
             parse(deep_jyaml, max_depth=5)
         assert "depth exceeded" in str(exc_info.value)
     
-    def test_max_size_limit(self):
-        """Test maximum input size limiting."""
-        small_jyaml = '{"small": "data"}'
-        large_jyaml = '{"large": "' + "x" * 1000 + '"}'
+    def test_normalize_line_endings(self):
+        """Test line ending normalization."""
+        windows_jyaml = '{\r\n  "key": "value"\r\n}'
         
-        # Should parse small input with size limit
-        doc = parse(small_jyaml, max_size=100)
+        # Should parse with normalization (default)
+        doc = parse(windows_jyaml, normalize_line_endings="lf")
         assert doc.data is not None
         
-        # Should fail large input with size limit
-        with pytest.raises(ParseError) as exc_info:
-            parse(large_jyaml, max_size=100)
-        assert "size limit exceeded" in str(exc_info.value)
+        # Should parse without normalization
+        doc = parse(windows_jyaml, normalize_line_endings="none")
+        assert doc.data is not None
     
     def test_preset_behavior(self):
         """Test preset behavior in real parsing."""
