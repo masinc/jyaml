@@ -126,11 +126,11 @@ impl<'a> Parser<'a> {
         if s.contains('.') || s.contains('e') || s.contains('E') {
             s.parse::<f64>()
                 .map(Number::Float)
-                .map_err(|_| self.syntax_error(&format!("Invalid number: {}", s)))
+                .map_err(|_| self.syntax_error(&format!("Invalid number: {s}")))
         } else {
             s.parse::<i64>()
                 .map(Number::Integer)
-                .map_err(|_| self.syntax_error(&format!("Invalid number: {}", s)))
+                .map_err(|_| self.syntax_error(&format!("Invalid number: {s}")))
         }
     }
 

@@ -703,8 +703,7 @@ impl SerializeOptionsBuilder {
                 .indent(4)
                 .sort_keys(true)),
             _ => Err(Error::InvalidOptions(format!(
-                "Unknown preset: {}. Available: compact, pretty, block, json_compatible, debug",
-                preset
+                "Unknown preset: {preset}. Available: compact, pretty, block, json_compatible, debug"
             ))),
         }
     }
@@ -1134,8 +1133,7 @@ impl DeserializeOptionsBuilder {
                 .include_comment_positions(true)
                 .allow_duplicate_keys(true)),
             _ => Err(Error::InvalidOptions(format!(
-                "Unknown preset: {}. Available: strict, permissive, fast, debug",
-                preset
+                "Unknown preset: {preset}. Available: strict, permissive, fast, debug"
             ))),
         }
     }

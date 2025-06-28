@@ -104,7 +104,7 @@ impl Serializer {
     }
 
     fn write_unicode_escape(&mut self, code: u32) -> Result<()> {
-        write!(&mut self.output, "\\u{:04X}", code)?;
+        write!(&mut self.output, "\\u{code:04X}")?;
         Ok(())
     }
 
@@ -116,8 +116,7 @@ impl Serializer {
 
         write!(
             &mut self.output,
-            "\\u{:04X}\\u{:04X}",
-            high_surrogate, low_surrogate
+            "\\u{high_surrogate:04X}\\u{low_surrogate:04X}"
         )?;
         Ok(())
     }
@@ -153,7 +152,7 @@ impl ser::Serializer for &mut Serializer {
     }
 
     fn serialize_i64(self, v: i64) -> Result<()> {
-        write!(&mut self.output, "{}", v)?;
+        write!(&mut self.output, "{v}")?;
         Ok(())
     }
 
@@ -170,7 +169,7 @@ impl ser::Serializer for &mut Serializer {
     }
 
     fn serialize_u64(self, v: u64) -> Result<()> {
-        write!(&mut self.output, "{}", v)?;
+        write!(&mut self.output, "{v}")?;
         Ok(())
     }
 
@@ -179,7 +178,7 @@ impl ser::Serializer for &mut Serializer {
     }
 
     fn serialize_f64(self, v: f64) -> Result<()> {
-        write!(&mut self.output, "{}", v)?;
+        write!(&mut self.output, "{v}")?;
         Ok(())
     }
 

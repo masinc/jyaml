@@ -180,7 +180,7 @@ impl<'a> Lexer<'a> {
                 }
             }
             Some(c) if c.is_ascii_alphabetic() => self.read_identifier(),
-            Some(c) => self.error(&format!("Unexpected character '{}'", c)),
+            Some(c) => self.error(&format!("Unexpected character '{c}'")),
         }
     }
 
@@ -274,7 +274,7 @@ impl<'a> Lexer<'a> {
             "null" => Ok(Token::Null),
             "true" => Ok(Token::True),
             "false" => Ok(Token::False),
-            _ => self.error(&format!("Invalid identifier '{}'", ident)),
+            _ => self.error(&format!("Invalid identifier '{ident}'")),
         }
     }
 
@@ -458,7 +458,7 @@ impl<'a> Lexer<'a> {
                 Err(_) => Err(Error::SyntaxError {
                     line: self.line,
                     column: self.column,
-                    message: format!("Invalid surrogate pair starting with U+{:04X}", code),
+                    message: format!("Invalid surrogate pair starting with U+{code:04X}"),
                 }),
             }
         } else if (0xDC00..=0xDFFF).contains(&code) {
@@ -466,14 +466,14 @@ impl<'a> Lexer<'a> {
             Err(Error::SyntaxError {
                 line: self.line,
                 column: self.column,
-                message: format!("Unexpected low surrogate U+{:04X}", code),
+                message: format!("Unexpected low surrogate U+{code:04X}"),
             })
         } else {
             // Regular Unicode character
             char::from_u32(code).ok_or_else(|| Error::SyntaxError {
                 line: self.line,
                 column: self.column,
-                message: format!("Invalid unicode code point U+{:04X}", code),
+                message: format!("Invalid unicode code point U+{code:04X}"),
             })
         }
     }
@@ -507,7 +507,7 @@ impl<'a> Lexer<'a> {
             return Err(Error::SyntaxError {
                 line: self.line,
                 column: self.column,
-                message: format!("Expected low surrogate (DC00-DFFF), got U+{:04X}", low_code),
+                message: format!("Expected low surrogate (DC00-DFFF), got U+{low_code:04X}"),
             });
         }
 
@@ -518,8 +518,7 @@ impl<'a> Lexer<'a> {
             line: self.line,
             column: self.column,
             message: format!(
-                "Invalid unicode code point from surrogate pair U+{:04X}",
-                code_point
+                "Invalid unicode code point from surrogate pair U+{code_point:04X}"
             ),
         })
     }
