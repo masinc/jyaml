@@ -517,9 +517,7 @@ impl<'a> Lexer<'a> {
         char::from_u32(code_point).ok_or_else(|| Error::SyntaxError {
             line: self.line,
             column: self.column,
-            message: format!(
-                "Invalid unicode code point from surrogate pair U+{code_point:04X}"
-            ),
+            message: format!("Invalid unicode code point from surrogate pair U+{code_point:04X}"),
         })
     }
 
