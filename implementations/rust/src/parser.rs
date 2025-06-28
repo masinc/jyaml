@@ -223,10 +223,18 @@ impl<'a> Parser<'a> {
             
             object.insert(key, value);
             
+            // Skip whitespace, comments, and newlines after value
+            while matches!(self.current_token, Token::Newline | Token::Indent(_)) {
+                self.advance()?;
+            }
             self.skip_whitespace_and_comments()?;
             
             if matches!(self.current_token, Token::Comma) {
                 self.advance()?;
+                // Skip whitespace, comments, and newlines after comma
+                while matches!(self.current_token, Token::Newline | Token::Indent(_)) {
+                    self.advance()?;
+                }
                 self.skip_whitespace_and_comments()?;
                 
                 // Allow trailing comma (comma followed by closing brace)
@@ -491,6 +499,7 @@ impl<'a> Parser<'a> {
     
     fn parse_object_from_first_key(&mut self, first_key: String) -> Result<Value> {
         let mut object = HashMap::new();
+        let mut expected_key_indent: Option<usize> = None;
         
         // Process first key-value pair
         self.advance()?; // Skip :
@@ -513,20 +522,34 @@ impl<'a> Parser<'a> {
         
         self.skip_newlines_and_comments()?;
         
-        // The base indentation for keys is 0 (no indentation)
-        let base_indent = 0;
-        
         // Process remaining key-value pairs
         loop {
-            // Skip any remaining indentation or newlines first
+            // First skip newlines and comments
             self.skip_newlines_and_comments()?;
+            
+            // Then check for indentation
+            let mut current_key_indent = 0;
+            if let Token::Indent(n) = self.current_token {
+                current_key_indent = n;
+                self.advance()?; // Skip the indent token
+            }
             
             match &self.current_token {
                 Token::String(key) => {
-                    // Check if we're at the correct indentation level for more keys
-                    let current_indent = self.current_indent();
-                    if current_indent != base_indent {
-                        break;
+                    // Set expected indentation from the first key we encounter
+                    if expected_key_indent.is_none() {
+                        expected_key_indent = Some(current_key_indent);
+                    }
+                    
+                    // Check for consistent indentation
+                    if let Some(expected) = expected_key_indent {
+                        if current_key_indent != expected {
+                            return Err(Error::InconsistentIndentation {
+                                line: self.lexer.current_position().0,
+                                expected,
+                                found: current_key_indent,
+                            });
+                        }
                     }
                     
                     let key = key.clone();
@@ -609,6 +632,9 @@ impl<'a> Parser<'a> {
             _ => return self.error("Expected indented content after '|'"),
         };
         
+        // Enter literal mode for reading raw content
+        self.lexer.enter_literal_mode();
+        
         let mut lines = Vec::new();
         
         loop {
@@ -617,26 +643,18 @@ impl<'a> Parser<'a> {
                     let indent_diff = n - content_indent;
                     self.advance()?;
                     
-                    // Collect the line content
-                    let mut line = String::new();
-                    for _ in 0..indent_diff {
-                        line.push(' ');
-                    }
-                    
-                    while !matches!(self.current_token, Token::Newline | Token::Eof) {
-                        match &self.current_token {
-                            Token::String(s) => line.push_str(s),
-                            Token::Number(n) => line.push_str(n),
-                            Token::True => line.push_str("true"),
-                            Token::False => line.push_str("false"),
-                            Token::Null => line.push_str("null"),
-                            _ => line.push_str(&format!("{:?}", self.current_token)),
+                    // Read line content as string token
+                    if let Token::String(content) = &self.current_token {
+                        let mut line = String::new();
+                        for _ in 0..indent_diff {
+                            line.push(' ');
                         }
-                        self.advance()?;
+                        line.push_str(content);
+                        lines.push(line);
+                        self.advance()?; // Skip content
                     }
                     
-                    lines.push(line);
-                    
+                    // Skip newline if present
                     if matches!(self.current_token, Token::Newline) {
                         self.advance()?;
                     } else {
@@ -650,6 +668,9 @@ impl<'a> Parser<'a> {
                 _ => break,
             }
         }
+        
+        // Exit literal mode
+        self.lexer.exit_literal_mode();
         
         let mut result = lines.join("\n");
         if !strip && !result.is_empty() {
@@ -682,23 +703,15 @@ impl<'a> Parser<'a> {
                     let indent_diff = n - content_indent;
                     self.advance()?;
                     
-                    // Collect the line content
+                    // Read raw line content
                     let mut line = String::new();
                     for _ in 0..indent_diff {
                         line.push(' ');
                     }
                     
-                    while !matches!(self.current_token, Token::Newline | Token::Eof) {
-                        match &self.current_token {
-                            Token::String(s) => line.push_str(s),
-                            Token::Number(n) => line.push_str(n),
-                            Token::True => line.push_str("true"),
-                            Token::False => line.push_str("false"),
-                            Token::Null => line.push_str("null"),
-                            _ => line.push_str(&format!("{:?}", self.current_token)),
-                        }
-                        self.advance()?;
-                    }
+                    // Read the rest of the line as raw content
+                    let raw_content = self.lexer.read_raw_line();
+                    line.push_str(&raw_content);
                     
                     current_paragraph.push(line);
                     

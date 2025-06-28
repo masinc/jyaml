@@ -39,6 +39,7 @@ pub struct Lexer<'a> {
     line: usize,
     column: usize,
     at_line_start: bool,
+    literal_mode: bool,
 }
 
 impl<'a> Lexer<'a> {
@@ -66,10 +67,37 @@ impl<'a> Lexer<'a> {
             line: 1,
             column: 1,
             at_line_start: true,
+            literal_mode: false,
         })
     }
     
     pub fn next_token(&mut self) -> Result<Token> {
+        // Handle literal mode - read raw lines as string tokens
+        if self.literal_mode {
+            // In literal mode, still handle indentation at line start
+            if self.at_line_start {
+                self.at_line_start = false;
+                let indent = self.count_indent()?;
+                if indent > 0 {
+                    return Ok(Token::Indent(indent));
+                }
+            }
+            
+            // Check for newlines
+            if self.current == Some('\n') {
+                self.advance();
+                self.at_line_start = true;
+                return Ok(Token::Newline);
+            }
+            
+            // Read rest of line as a string token
+            let content = self.read_raw_line();
+            if content.is_empty() {
+                return Ok(Token::Eof);
+            }
+            return Ok(Token::String(content));
+        }
+        
         // Handle indentation at line start
         if self.at_line_start {
             self.at_line_start = false;
@@ -206,7 +234,6 @@ impl<'a> Lexer<'a> {
                 }
                 '\t' => {
                     // Tabs are not allowed in JYAML - error immediately
-                    eprintln!("DEBUG: Found tab at line {}, column {}", self.line, self.column);
                     return Err(Error::TabInIndentation {
                         line: self.line,
                         column: self.column,
@@ -511,6 +538,29 @@ impl<'a> Lexer<'a> {
     
     pub fn current_position(&self) -> (usize, usize) {
         (self.line, self.column)
+    }
+    
+    /// Read a line of raw content for literal strings, without tokenizing
+    pub fn read_raw_line(&mut self) -> String {
+        let mut content = String::new();
+        while let Some(ch) = self.current {
+            if ch == '\n' {
+                break;
+            }
+            content.push(ch);
+            self.advance();
+        }
+        content
+    }
+    
+    /// Enter literal mode where text is read as raw content
+    pub fn enter_literal_mode(&mut self) {
+        self.literal_mode = true;
+    }
+    
+    /// Exit literal mode
+    pub fn exit_literal_mode(&mut self) {
+        self.literal_mode = false;
     }
 }
 
