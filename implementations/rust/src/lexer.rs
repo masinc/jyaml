@@ -622,7 +622,10 @@ impl<'a> Lexer<'a> {
 
             // If it's just a newline (empty line), handle it
             if self.current == Some('\n') {
-                lines.push(String::new());
+                // For empty lines, preserve any spaces that were counted as indentation
+                // beyond the content_indent level
+                let spaces_beyond_indent = line_indent.saturating_sub(content_indent);
+                lines.push(" ".repeat(spaces_beyond_indent));
                 self.advance();
                 self.at_line_start = true;
                 continue;
@@ -664,8 +667,21 @@ impl<'a> Lexer<'a> {
                 // Keep: preserve all trailing newlines
                 if !result.is_empty() {
                     result.push('\n');
-                    // For keep mode, we might need to preserve additional newlines
-                    // This is a simplified implementation
+                }
+                // Count additional trailing newlines from the final empty lines
+                let trailing_newlines = lines.iter().rev()
+                    .take_while(|line| line.trim().is_empty())
+                    .count();
+                
+                // Add additional newlines for keep mode
+                // For keep mode, we need at least one additional newline if there are any trailing empty lines
+                if trailing_newlines > 0 {
+                    for _ in 0..trailing_newlines {
+                        result.push('\n');
+                    }
+                } else {
+                    // Even without explicit empty lines, keep mode adds an extra newline
+                    result.push('\n');
                 }
             }
         }
@@ -829,13 +845,9 @@ impl<'a> Lexer<'a> {
         }
 
         if !current_paragraph.is_empty() {
-            // For Keep chomping indicator, preserve line breaks within paragraphs
-            let separator = if matches!(chomping, ChompingIndicator::Keep) {
-                "\n"
-            } else {
-                " "
-            };
-            paragraphs.push(current_paragraph.join(separator));
+            // Folded strings always join lines with spaces within paragraphs
+            // The chomping indicator only affects trailing newlines, not line folding
+            paragraphs.push(current_paragraph.join(" "));
         }
 
         let mut result = paragraphs.join("\n");

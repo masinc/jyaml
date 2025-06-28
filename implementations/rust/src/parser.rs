@@ -621,7 +621,16 @@ impl<'a> Parser<'a> {
 
         let content_indent = match self.current_token {
             Token::Indent(n) => n,
-            _ => return self.error("Expected indented content after '|'"),
+            // Allow empty literal blocks (no indentation means empty content)
+            _ => {
+                // Empty literal block - return empty string with proper chomping
+                let result = match chomping {
+                    ChompingIndicator::Clip => "".to_string(),
+                    ChompingIndicator::Strip => "".to_string(),
+                    ChompingIndicator::Keep => "".to_string(),
+                };
+                return Ok(Value::String(result));
+            }
         };
 
         // Use the specialized lexer method to read the multiline block
@@ -649,7 +658,16 @@ impl<'a> Parser<'a> {
 
         let content_indent = match self.current_token {
             Token::Indent(n) => n,
-            _ => return self.error("Expected indented content after '>'"),
+            // Allow empty folded blocks (no indentation means empty content)
+            _ => {
+                // Empty folded block - return empty string with proper chomping
+                let result = match chomping {
+                    ChompingIndicator::Clip => "".to_string(),
+                    ChompingIndicator::Strip => "".to_string(),
+                    ChompingIndicator::Keep => "".to_string(),
+                };
+                return Ok(Value::String(result));
+            }
         };
 
         // Use the specialized lexer method to read the folded block
