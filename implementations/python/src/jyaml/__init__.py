@@ -47,8 +47,7 @@ def main():
             print("Valid JYAML")
         else:
             data = loads(content)
-            import json
-            print(json.dumps(data, indent=2, ensure_ascii=False))
+            print(dumps(data, style='block', indent=2))
     except (LexerError, ParseError) as e:
         print(f"Parse error: {e}", file=sys.stderr)
         sys.exit(1)
