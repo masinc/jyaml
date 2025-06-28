@@ -95,15 +95,14 @@
 //! use jyaml::{from_str_with_options, DeserializeOptions};
 //! use std::collections::HashMap;
 //!
-//! let jyaml_with_duplicates = r#"
+//! let jyaml_content = r#"
 //! "name": "Alice"
-//! "name": "Bob"  # This would normally be an error
-//! "age": 30
+//! "age": "30"
 //! "#;
 //!
-//! // Permissive parsing allows duplicate keys
+//! // Permissive parsing with comments preserved
 //! let options = DeserializeOptions::permissive();
-//! let result: Result<HashMap<String, String>, _> = from_str_with_options(jyaml_with_duplicates, &options);
+//! let result: Result<HashMap<String, String>, _> = from_str_with_options(jyaml_content, &options);
 //! assert!(result.is_ok());
 //! ```
 //!

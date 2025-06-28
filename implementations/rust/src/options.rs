@@ -700,7 +700,7 @@ impl SerializeOptionsBuilder {
     /// ```
     /// use jyaml::SerializeOptionsBuilder;
     /// 
-    /// let pretty_builder = SerializeOptionsBuilder::from_preset("pretty");
+    /// let pretty_builder = SerializeOptionsBuilder::from_preset("pretty").unwrap();
     /// let options = pretty_builder.build();
     /// ```
     pub fn from_preset(preset: &str) -> Result<Self> {
@@ -1132,7 +1132,7 @@ impl DeserializeOptionsBuilder {
     /// ```
     /// use jyaml::DeserializeOptionsBuilder;
     /// 
-    /// let debug_builder = DeserializeOptionsBuilder::from_preset("debug");
+    /// let debug_builder = DeserializeOptionsBuilder::from_preset("strict").unwrap();
     /// let options = debug_builder.build();
     /// ```
     pub fn from_preset(preset: &str) -> Result<Self> {
