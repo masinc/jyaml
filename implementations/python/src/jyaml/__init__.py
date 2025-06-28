@@ -1,9 +1,7 @@
 """JYAML (JSON-YAML Adaptive Markup Language) parser for Python."""
 
-from .parser import (
-    parse, loads, Parser, ParseError,
-    loads_strict, loads_permissive, loads_fast, loads_ordered
-)
+from .parser import parse, Parser, ParseError
+from .loader import loads, loads_strict, loads_permissive, loads_fast, loads_ordered
 from .options import ParseOptions, LoadOptions, DumpOptions, JYAMLMode
 from .dumper import dumps
 from .types import (
