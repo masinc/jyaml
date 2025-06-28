@@ -1,6 +1,56 @@
 //! JYAML parsing and serialization options
+//!
+//! This module provides comprehensive options for configuring JYAML parsing and serialization.
+//! The options system includes:
+//!
+//! - **Preset configurations** for common use cases
+//! - **Builder patterns** for convenient option construction
+//! - **Validation** to ensure option consistency
+//! - **Serialization support** for saving/loading configurations
+//!
+//! # Basic Usage
+//!
+//! ```
+//! use jyaml::{from_str_with_options, to_string_with_options, DeserializeOptions, SerializeOptions};
+//! use std::collections::HashMap;
+//!
+//! // Use presets for common configurations
+//! let permissive = DeserializeOptions::permissive();
+//! let pretty = SerializeOptions::pretty();
+//!
+//! // Or use builders for custom configurations
+//! let custom_parse = DeserializeOptions::builder()
+//!     .strict_mode(false)
+//!     .max_depth(500)
+//!     .allow_duplicate_keys(true)
+//!     .build();
+//!
+//! let custom_serialize = SerializeOptions::builder()
+//!     .pretty(true)
+//!     .indent(4)
+//!     .sort_keys(true)
+//!     .build();
+//! ```
+//!
+//! # Available Presets
+//!
+//! ## DeserializeOptions Presets
+//! - `strict()` - Strict JYAML spec compliance
+//! - `permissive()` - Lenient parsing allowing duplicates
+//! - `fast()` - Fast parsing with minimal features
+//! - `debug()` - Debug mode with maximum information
+//!
+//! ## SerializeOptions Presets
+//! - `compact()` - Minimal whitespace for storage/transmission
+//! - `pretty()` - Human-readable with proper formatting
+//! - `block()` - YAML-style block format
+//! - `json_compatible()` - JSON-compatible output
+//! - `debug()` - Debug-friendly output with verbose formatting
 
 use crate::{Result, Error};
+
+#[cfg(feature = "serde")]
+use serde::{Serialize, Deserialize};
 
 /// Output style for JYAML serialization
 /// 
@@ -30,6 +80,7 @@ use crate::{Result, Error};
 /// // "age": "30"
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum OutputStyle {
     /// Compact JSON-like format with minimal whitespace
     /// 
@@ -75,6 +126,7 @@ impl Default for OutputStyle {
 /// // Would output: 'Hello World' (if implemented)
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum QuoteStyle {
     /// Always use double quotes (`"`)
     /// 
@@ -129,6 +181,7 @@ impl Default for QuoteStyle {
 ///     .build();
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum LineEnding {
     /// No normalization - preserve original line endings
     /// 
@@ -188,6 +241,7 @@ impl Default for LineEnding {
 /// - [`fast()`](DeserializeOptions::fast) - Fast parsing with minimal features
 /// - [`debug()`](DeserializeOptions::debug) - Debug mode with maximum information
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct DeserializeOptions {
     /// Enable strict mode parsing
     /// 
@@ -321,6 +375,7 @@ impl Default for DeserializeOptions {
 /// - [`block()`](SerializeOptions::block) - YAML-style block format
 /// - [`json_compatible()`](SerializeOptions::json_compatible) - JSON-compatible output
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct SerializeOptions {
     /// Output style (flow, block, or auto)
     /// 
@@ -431,6 +486,29 @@ impl SerializeOptions {
         SerializeOptionsBuilder::new()
     }
     
+    /// Create options from a preset name
+    /// 
+    /// Available presets:
+    /// - "compact" - Minimal whitespace for storage/transmission
+    /// - "pretty" - Human-readable with proper formatting
+    /// - "block" - YAML-style block format
+    /// - "json_compatible" - JSON-compatible output
+    /// - "debug" - Debug-friendly output with verbose formatting
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// use jyaml::SerializeOptions;
+    /// 
+    /// let opts = SerializeOptions::from_preset("debug").unwrap();
+    /// assert!(opts.pretty);
+    /// assert!(opts.sort_keys);
+    /// assert_eq!(opts.indent, 4);
+    /// ```
+    pub fn from_preset(preset: &str) -> Result<Self> {
+        SerializeOptionsBuilder::from_preset(preset).map(|b| b.build())
+    }
+    
     /// Create options for compact output
     pub fn compact() -> Self {
         Self::builder()
@@ -467,6 +545,16 @@ impl SerializeOptions {
             .sort_keys(false)
             .pretty(false)
             .indent(0)
+            .build()
+    }
+    
+    /// Create options for debug output
+    pub fn debug() -> Self {
+        Self::builder()
+            .style(OutputStyle::Block)
+            .pretty(true)
+            .indent(4)
+            .sort_keys(true)
             .build()
     }
     
@@ -518,6 +606,61 @@ impl SerializeOptions {
         }
         self
     }
+    
+    /// Validate options for consistency
+    /// 
+    /// Checks for incompatible option combinations and returns an error
+    /// if any are found.
+    /// 
+    /// # Errors
+    /// 
+    /// - `InvalidOptions` if indent > 8
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// use jyaml::SerializeOptions;
+    /// 
+    /// let valid_opts = SerializeOptions::default();
+    /// assert!(valid_opts.validate().is_ok());
+    /// 
+    /// let invalid_opts = SerializeOptions {
+    ///     indent: 10,
+    ///     ..Default::default()
+    /// };
+    /// assert!(invalid_opts.validate().is_err());
+    /// ```
+    pub fn validate(&self) -> Result<()> {
+        if self.indent > 8 {
+            return Err(Error::InvalidOptions("Indent must be 0-8 spaces".to_string()));
+        }
+        
+        Ok(())
+    }
+    
+    /// Check if this configuration produces compact output
+    pub fn is_compact(&self) -> bool {
+        !self.pretty && self.style == OutputStyle::Flow
+    }
+    
+    /// Check if this configuration produces human-readable output
+    pub fn is_readable(&self) -> bool {
+        self.pretty && (self.style == OutputStyle::Block || self.style == OutputStyle::Auto)
+    }
+    
+    /// Get effective line ending (resolves None to platform default)
+    pub fn effective_line_ending(&self) -> LineEnding {
+        match self.line_ending {
+            LineEnding::None => {
+                // Default to platform-appropriate line ending
+                #[cfg(windows)]
+                return LineEnding::Crlf;
+                #[cfg(not(windows))]
+                return LineEnding::Lf;
+            }
+            other => other,
+        }
+    }
 }
 
 impl SerializeOptionsBuilder {
@@ -540,6 +683,55 @@ impl SerializeOptionsBuilder {
             sort_keys: false,
             line_ending: LineEnding::None,
             pretty: false,
+        }
+    }
+    
+    /// Create builder from a preset configuration
+    /// 
+    /// Available presets:
+    /// - "compact" - Minimal whitespace for storage/transmission
+    /// - "pretty" - Human-readable with proper formatting
+    /// - "block" - YAML-style block format
+    /// - "json_compatible" - JSON-compatible output
+    /// - "debug" - Debug-friendly output with verbose formatting
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// use jyaml::SerializeOptionsBuilder;
+    /// 
+    /// let pretty_builder = SerializeOptionsBuilder::from_preset("pretty");
+    /// let options = pretty_builder.build();
+    /// ```
+    pub fn from_preset(preset: &str) -> Result<Self> {
+        match preset {
+            "compact" => Ok(Self::new()
+                .style(OutputStyle::Flow)
+                .pretty(false)
+                .indent(0)),
+            "pretty" => Ok(Self::new()
+                .style(OutputStyle::Auto)
+                .pretty(true)
+                .indent(2)),
+            "block" => Ok(Self::new()
+                .style(OutputStyle::Block)
+                .pretty(true)
+                .indent(2)),
+            "json_compatible" => Ok(Self::new()
+                .style(OutputStyle::Flow)
+                .quote_style(QuoteStyle::Double)
+                .escape_unicode(true)
+                .sort_keys(false)
+                .pretty(false)
+                .indent(0)),
+            "debug" => Ok(Self::new()
+                .style(OutputStyle::Block)
+                .pretty(true)
+                .indent(4)
+                .sort_keys(true)),
+            _ => Err(Error::InvalidOptions(
+                format!("Unknown preset: {}. Available: compact, pretty, block, json_compatible, debug", preset)
+            ))
         }
     }
     
@@ -750,6 +942,27 @@ impl DeserializeOptions {
         DeserializeOptionsBuilder::new()
     }
     
+    /// Create options from a preset name
+    /// 
+    /// Available presets:
+    /// - "strict" - Strict JYAML spec compliance (default)
+    /// - "permissive" - Lenient parsing allowing duplicates  
+    /// - "fast" - Fast parsing with minimal features
+    /// - "debug" - Debug mode with maximum information
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// use jyaml::DeserializeOptions;
+    /// 
+    /// let opts = DeserializeOptions::from_preset("debug").unwrap();
+    /// assert!(!opts.strict_mode);
+    /// assert!(opts.include_comment_positions);
+    /// ```
+    pub fn from_preset(preset: &str) -> Result<Self> {
+        DeserializeOptionsBuilder::from_preset(preset).map(|b| b.build())
+    }
+    
     /// Create strict parsing options
     pub fn strict() -> Self {
         Self::builder()
@@ -823,6 +1036,65 @@ impl DeserializeOptions {
         self.normalize_line_endings = ending;
         self
     }
+    
+    /// Validate options for consistency
+    /// 
+    /// Checks for incompatible option combinations and returns an error
+    /// if any are found.
+    /// 
+    /// # Errors
+    /// 
+    /// - `InvalidOptions` if strict_mode and allow_duplicate_keys are both true
+    /// - `InvalidOptions` if include_comment_positions is true but preserve_comments is false
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// use jyaml::DeserializeOptions;
+    /// 
+    /// let valid_opts = DeserializeOptions::default();
+    /// assert!(valid_opts.validate().is_ok());
+    /// 
+    /// let invalid_opts = DeserializeOptions {
+    ///     strict_mode: true,
+    ///     allow_duplicate_keys: true,
+    ///     ..Default::default()
+    /// };
+    /// assert!(invalid_opts.validate().is_err());
+    /// ```
+    pub fn validate(&self) -> Result<()> {
+        if self.strict_mode && self.allow_duplicate_keys {
+            return Err(Error::InvalidOptions(
+                "strict_mode and allow_duplicate_keys are incompatible".to_string()
+            ));
+        }
+        
+        if self.include_comment_positions && !self.preserve_comments {
+            return Err(Error::InvalidOptions(
+                "include_comment_positions requires preserve_comments=true".to_string()
+            ));
+        }
+        
+        if self.max_depth == 0 {
+            return Err(Error::InvalidOptions("Max depth must be at least 1".to_string()));
+        }
+        
+        if self.max_depth > 100000 {
+            return Err(Error::InvalidOptions("Max depth too large (max 100000)".to_string()));
+        }
+        
+        Ok(())
+    }
+    
+    /// Check if this configuration is for strict parsing
+    pub fn is_strict(&self) -> bool {
+        self.strict_mode && !self.allow_duplicate_keys
+    }
+    
+    /// Check if this configuration preserves all information
+    pub fn is_preserving(&self) -> bool {
+        self.preserve_comments && self.include_comment_positions
+    }
 }
 
 impl DeserializeOptionsBuilder {
@@ -844,6 +1116,48 @@ impl DeserializeOptionsBuilder {
             preserve_comments: true,
             include_comment_positions: false,
             normalize_line_endings: LineEnding::None,
+        }
+    }
+    
+    /// Create builder from a preset configuration
+    /// 
+    /// Available presets:
+    /// - "strict" - Strict JYAML spec compliance (default)
+    /// - "permissive" - Lenient parsing allowing duplicates  
+    /// - "fast" - Fast parsing with minimal features
+    /// - "debug" - Debug mode with maximum information
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// use jyaml::DeserializeOptionsBuilder;
+    /// 
+    /// let debug_builder = DeserializeOptionsBuilder::from_preset("debug");
+    /// let options = debug_builder.build();
+    /// ```
+    pub fn from_preset(preset: &str) -> Result<Self> {
+        match preset {
+            "strict" => Ok(Self::new()
+                .strict_mode(true)
+                .preserve_comments(true)
+                .max_depth(1000)),
+            "permissive" => Ok(Self::new()
+                .strict_mode(false)
+                .preserve_comments(true)
+                .allow_duplicate_keys(true)
+                .max_depth(10000)),
+            "fast" => Ok(Self::new()
+                .strict_mode(true)
+                .preserve_comments(false)
+                .max_depth(100)),
+            "debug" => Ok(Self::new()
+                .strict_mode(false)
+                .preserve_comments(true)
+                .include_comment_positions(true)
+                .allow_duplicate_keys(true)),
+            _ => Err(Error::InvalidOptions(
+                format!("Unknown preset: {}. Available: strict, permissive, fast, debug", preset)
+            ))
         }
     }
     
@@ -950,11 +1264,14 @@ impl DeserializeOptionsBuilder {
     
     /// Build the DeserializeOptions with strict validation
     /// 
-    /// Returns an error if any values are out of valid ranges.
+    /// Returns an error if any values are out of valid ranges or if there are
+    /// incompatible option combinations.
     /// 
     /// # Errors
     /// 
     /// - `InvalidOptions` if max_depth is 0 or > 100000
+    /// - `InvalidOptions` if strict_mode and allow_duplicate_keys are both true
+    /// - `InvalidOptions` if include_comment_positions is true but preserve_comments is false
     /// 
     /// # Examples
     /// 
@@ -970,14 +1287,34 @@ impl DeserializeOptionsBuilder {
     ///     .max_depth(0)  // Invalid
     ///     .try_build();
     /// assert!(result.is_err());
+    /// 
+    /// let result = DeserializeOptionsBuilder::new()
+    ///     .strict_mode(true)
+    ///     .allow_duplicate_keys(true)  // Incompatible
+    ///     .try_build();
+    /// assert!(result.is_err());
     /// ```
     pub fn try_build(self) -> Result<DeserializeOptions> {
+        // Validate depth limits
         if self.max_depth == 0 {
             return Err(Error::InvalidOptions("Max depth must be at least 1".to_string()));
         }
         
         if self.max_depth > 100000 {
             return Err(Error::InvalidOptions("Max depth too large (max 100000)".to_string()));
+        }
+        
+        // Validate option compatibility
+        if self.strict_mode && self.allow_duplicate_keys {
+            return Err(Error::InvalidOptions(
+                "strict_mode and allow_duplicate_keys are incompatible".to_string()
+            ));
+        }
+        
+        if self.include_comment_positions && !self.preserve_comments {
+            return Err(Error::InvalidOptions(
+                "include_comment_positions requires preserve_comments=true".to_string()
+            ));
         }
         
         Ok(DeserializeOptions {
@@ -1047,6 +1384,19 @@ mod tests {
     fn test_serialize_options_validation() {
         let result = SerializeOptions::default().with_indent(10);
         assert!(result.is_err());
+        
+        // Test builder validation
+        let result = SerializeOptionsBuilder::new()
+            .indent(10)
+            .try_build();
+        assert!(result.is_err());
+        
+        // Test direct validation
+        let invalid = SerializeOptions {
+            indent: 10,
+            ..Default::default()
+        };
+        assert!(invalid.validate().is_err());
     }
     
     #[test]
@@ -1084,5 +1434,59 @@ mod tests {
         assert_eq!(opts.max_depth, 5000);
         assert!(opts.allow_duplicate_keys);
         assert!(!opts.preserve_comments);
+    }
+    
+    #[test]
+    fn test_preset_creation() {
+        let debug = SerializeOptions::from_preset("debug").unwrap();
+        assert_eq!(debug.style, OutputStyle::Block);
+        assert!(debug.pretty);
+        assert!(debug.sort_keys);
+        assert_eq!(debug.indent, 4);
+        
+        let compact = SerializeOptions::from_preset("compact").unwrap();
+        assert_eq!(compact.style, OutputStyle::Flow);
+        assert!(!compact.pretty);
+        assert_eq!(compact.indent, 0);
+        
+        let invalid = SerializeOptions::from_preset("invalid");
+        assert!(invalid.is_err());
+    }
+    
+    #[test]
+    fn test_validation() {
+        // Valid options should pass
+        let valid = DeserializeOptions::default();
+        assert!(valid.validate().is_ok());
+        
+        // Invalid combinations should fail
+        let invalid = DeserializeOptions {
+            strict_mode: true,
+            allow_duplicate_keys: true,
+            ..Default::default()
+        };
+        assert!(invalid.validate().is_err());
+        
+        let invalid2 = DeserializeOptions {
+            preserve_comments: false,
+            include_comment_positions: true,
+            ..Default::default()
+        };
+        assert!(invalid2.validate().is_err());
+    }
+    
+    #[test]
+    fn test_helper_methods() {
+        let strict = DeserializeOptions::strict();
+        assert!(strict.is_strict());
+        
+        let debug = DeserializeOptions::debug();
+        assert!(debug.is_preserving());
+        
+        let compact = SerializeOptions::compact();
+        assert!(compact.is_compact());
+        
+        let pretty = SerializeOptions::pretty();
+        assert!(pretty.is_readable());
     }
 }
