@@ -1,4 +1,4 @@
-use jyaml::{parse, to_string, from_str, Value};
+use jyaml::{from_str, parse, to_string, Value};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -70,9 +70,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("7. Serialize to JYAML:");
     let mut data = HashMap::new();
     data.insert("name".to_string(), Value::String("Diana".to_string()));
-    data.insert("age".to_string(), Value::Number(jyaml::value::Number::Integer(28)));
+    data.insert(
+        "age".to_string(),
+        Value::Number(jyaml::value::Number::Integer(28)),
+    );
     data.insert("active".to_string(), Value::Bool(true));
-    
+
     let serialized = to_string(&Value::Object(data))?;
     println!("  Serialized: {}\n", serialized);
 
@@ -84,7 +87,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 "languages": ["Rust", "Go", "TypeScript"]
 "active": true
 "#;
-    
+
     let person: Person = from_str(person_jyaml)?;
     println!("  JYAML:\n{}", person_jyaml);
     println!("  Deserialized struct: {:?}\n", person);
@@ -103,7 +106,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   "debug": true
   "max_connections": 100
 "#;
-    
+
     let complex = parse(complex_jyaml)?;
     println!("  JYAML:\n{}", complex_jyaml);
     println!("  Parsed: {:#?}\n", complex);

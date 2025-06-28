@@ -91,8 +91,8 @@ impl serde::ser::Error for Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::error::Error as StdError;
     use serde::de::Error as DeError;
+    use std::error::Error as StdError;
 
     #[test]
     fn test_error_display() {
@@ -162,7 +162,10 @@ mod tests {
         assert!(display.contains("Duplicate key 'name'"));
 
         // Test BlockInFlow display
-        let error = Error::BlockInFlow { line: 1, column: 10 };
+        let error = Error::BlockInFlow {
+            line: 1,
+            column: 10,
+        };
         let display = format!("{}", error);
         assert!(display.contains("Block style not allowed in flow context"));
 

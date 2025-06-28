@@ -3,8 +3,8 @@
 use crate::{
     error::{Error, Result},
     lexer::{ChompingIndicator, Lexer, Token},
-    value::{Number, Value},
     options::DeserializeOptions,
+    value::{Number, Value},
 };
 use std::collections::HashMap;
 
@@ -21,11 +21,11 @@ impl<'a> Parser<'a> {
     pub fn new(input: &'a str) -> Result<Self> {
         Self::new_with_options(input, &DeserializeOptions::default())
     }
-    
+
     pub fn new_with_options(input: &'a str, options: &DeserializeOptions) -> Result<Self> {
         let mut lexer = Lexer::new(input)?;
         let current_token = lexer.next_token()?;
-        
+
         Ok(Parser {
             lexer,
             current_token,
@@ -35,12 +35,12 @@ impl<'a> Parser<'a> {
             depth: 0,
         })
     }
-    
+
     pub fn parse(&mut self) -> Result<Value> {
         self.skip_newlines_and_comments()?;
-        
+
         let value = self.parse_value()?;
-        
+
         // Skip any remaining whitespace, comments, and newlines
         loop {
             match self.current_token {
@@ -54,10 +54,10 @@ impl<'a> Parser<'a> {
                 _ => return self.error("Expected end of input"),
             }
         }
-        
+
         Ok(value)
     }
-    
+
     fn parse_value(&mut self) -> Result<Value> {
         // Check max depth
         self.depth += 1;
@@ -68,19 +68,18 @@ impl<'a> Parser<'a> {
                 message: format!("Maximum parsing depth {} exceeded", self.options.max_depth),
             });
         }
-        
+
         let result = self.parse_value_with_indent_context(0);
         self.depth -= 1;
         result
     }
-    
+
     fn parse_value_with_indent_context(&mut self, expected_indent: usize) -> Result<Value> {
         // Skip indentation if present
         if let Token::Indent(_) = self.current_token {
             self.advance()?;
         }
-        
-        
+
         match &self.current_token {
             Token::Null => {
                 self.advance()?;
@@ -102,7 +101,7 @@ impl<'a> Parser<'a> {
             Token::String(s) => {
                 let value = s.clone();
                 self.advance()?;
-                
+
                 // Check for object key
                 if matches!(self.current_token, Token::Colon) {
                     self.parse_object_from_first_key(value)
@@ -118,13 +117,13 @@ impl<'a> Parser<'a> {
                 } else {
                     self.parse_block_array_with_context(Some(expected_indent))
                 }
-            },
+            }
             Token::Pipe | Token::PipeStrip | Token::PipeKeep => self.parse_literal_string(),
             Token::Greater | Token::GreaterStrip | Token::GreaterKeep => self.parse_folded_string(),
             _ => self.error("Expected value"),
         }
     }
-    
+
     fn parse_number(&self, s: String) -> Result<Number> {
         if s.contains('.') || s.contains('e') || s.contains('E') {
             s.parse::<f64>()
@@ -136,32 +135,32 @@ impl<'a> Parser<'a> {
                 .map_err(|_| self.syntax_error(&format!("Invalid number: {}", s)))
         }
     }
-    
+
     fn parse_flow_array(&mut self) -> Result<Value> {
         self.advance()?; // Skip [
         self.skip_whitespace_and_comments()?;
-        
+
         let mut array = Vec::new();
-        
+
         while !matches!(self.current_token, Token::RightBracket) {
             // Skip newlines and indentation in flow context
             while matches!(self.current_token, Token::Newline | Token::Indent(_)) {
                 self.advance()?;
             }
-            
+
             // Check for closing bracket after skipping whitespace
             if matches!(self.current_token, Token::RightBracket) {
                 break;
             }
-            
+
             array.push(self.parse_value()?);
-            
+
             self.skip_whitespace_and_comments()?;
-            
+
             if matches!(self.current_token, Token::Comma) {
                 self.advance()?;
                 self.skip_whitespace_and_comments()?;
-                
+
                 // Allow trailing comma (comma followed by closing bracket)
                 if matches!(self.current_token, Token::RightBracket) {
                     break;
@@ -170,46 +169,46 @@ impl<'a> Parser<'a> {
                 return self.error("Expected ',' or ']'");
             }
         }
-        
+
         self.advance()?; // Skip ]
         Ok(Value::Array(array))
     }
-    
+
     fn parse_flow_object(&mut self) -> Result<Value> {
         self.advance()?; // Skip {
         self.skip_whitespace_and_comments()?;
-        
+
         let mut object = HashMap::new();
-        
+
         while !matches!(self.current_token, Token::RightBrace) {
             // Skip newlines, indentation, and comments in flow context
             while matches!(self.current_token, Token::Newline | Token::Indent(_)) {
                 self.advance()?;
             }
             self.skip_whitespace_and_comments()?;
-            
+
             // Check if we hit closing brace after whitespace/comments
             if matches!(self.current_token, Token::RightBrace) {
                 break;
             }
-            
+
             let key = match &self.current_token {
                 Token::String(s) => s.clone(),
                 _ => return self.error("Expected string key in object"),
             };
             self.advance()?;
-            
+
             self.skip_whitespace_and_comments()?;
-            
+
             if !matches!(self.current_token, Token::Colon) {
                 return self.error("Expected ':' after object key");
             }
             self.advance()?;
-            
+
             self.skip_whitespace_and_comments()?;
-            
+
             let value = self.parse_value()?;
-            
+
             if object.contains_key(&key) {
                 if !self.options.allow_duplicate_keys {
                     return Err(Error::DuplicateKey {
@@ -220,15 +219,15 @@ impl<'a> Parser<'a> {
                 }
                 // If duplicates are allowed, the last value wins (default HashMap behavior)
             }
-            
+
             object.insert(key, value);
-            
+
             // Skip whitespace, comments, and newlines after value
             while matches!(self.current_token, Token::Newline | Token::Indent(_)) {
                 self.advance()?;
             }
             self.skip_whitespace_and_comments()?;
-            
+
             if matches!(self.current_token, Token::Comma) {
                 self.advance()?;
                 // Skip whitespace, comments, and newlines after comma
@@ -236,7 +235,7 @@ impl<'a> Parser<'a> {
                     self.advance()?;
                 }
                 self.skip_whitespace_and_comments()?;
-                
+
                 // Allow trailing comma (comma followed by closing brace)
                 if matches!(self.current_token, Token::RightBrace) {
                     break;
@@ -245,20 +244,19 @@ impl<'a> Parser<'a> {
                 return self.error("Expected ',' or '}'");
             }
         }
-        
+
         self.advance()?; // Skip }
         Ok(Value::Object(object))
     }
-    
+
     fn parse_block_array_with_context(&mut self, context_indent: Option<usize>) -> Result<Value> {
         let mut array = Vec::new();
-        
+
         // Determine the base indent from the current position
         // If we're already at an indent token, use that level
         // Otherwise, we expect the next line to have indentation
         let mut base_indent = context_indent;
-        
-        
+
         // If we already have a context_indent and we are at a dash immediately,
         // process it without requiring an indent token first
         if base_indent.is_some() && matches!(self.current_token, Token::Dash) {
@@ -267,16 +265,16 @@ impl<'a> Parser<'a> {
             self.skip_inline_whitespace();
             let element = self.parse_array_element(base_indent)?;
             array.push(element);
-            
+
             self.skip_newlines_and_comments()?;
         } else {
             self.skip_newlines_and_comments()?;
         }
-        
+
         loop {
             // Store the current indent level before processing
             let current_indent_level = self.current_indent();
-            
+
             // If we encounter an indent token, this might be our base indent
             if let Token::Indent(n) = self.current_token {
                 if base_indent.is_none() {
@@ -307,14 +305,14 @@ impl<'a> Parser<'a> {
                 // No indent and no dash, we're done
                 break;
             }
-            
+
             // If we see a string that could be an object key at the root level,
             // check if it's actually outside this array
             if matches!(self.current_token, Token::String(_)) {
                 if let Ok(peek_token) = self.peek() {
                     if matches!(peek_token, Token::Colon) {
                         // This looks like a key-value pair
-                        // If we have a base indent and we're not at that level, 
+                        // If we have a base indent and we're not at that level,
                         // this terminates the array
                         if base_indent.is_some() && self.current_indent() == 0 {
                             break;
@@ -322,31 +320,31 @@ impl<'a> Parser<'a> {
                     }
                 }
             }
-            
+
             // We should only get here if we have a dash token
             assert!(matches!(self.current_token, Token::Dash));
-            
+
             self.advance()?; // Skip -
             self.skip_inline_whitespace();
-            
+
             // Parse array element with special handling for objects
             let element = self.parse_array_element(base_indent)?;
             array.push(element);
-            
+
             // Skip trailing whitespace and comments on the same line
             self.skip_newlines_and_comments()?;
         }
-        
+
         Ok(Value::Array(array))
     }
-    
+
     fn parse_array_element(&mut self, array_base_indent: Option<usize>) -> Result<Value> {
         // Parse a single array element with proper scope detection
         match &self.current_token {
             Token::String(s) => {
                 let value = s.clone();
                 self.advance()?;
-                
+
                 // Check for object key in array element
                 if matches!(self.current_token, Token::Colon) {
                     self.parse_array_element_object(value, array_base_indent)
@@ -357,23 +355,26 @@ impl<'a> Parser<'a> {
             _ => self.parse_value(),
         }
     }
-    
-    fn parse_array_element_object(&mut self, first_key: String, array_base_indent: Option<usize>) -> Result<Value> {
+
+    fn parse_array_element_object(
+        &mut self,
+        first_key: String,
+        array_base_indent: Option<usize>,
+    ) -> Result<Value> {
         let mut object = HashMap::new();
-        
-        
+
         // Remember the indent level of the first key for this array element
         let _object_key_indent = array_base_indent.map(|indent| indent + 2).unwrap_or(2);
-        
+
         // Process first key-value pair
         self.advance()?; // Skip :
         self.skip_inline_whitespace();
-        
+
         // Check if there's a newline after colon (indicates block style value)
         if matches!(self.current_token, Token::Newline) {
             self.advance()?; // Skip newline
             self.skip_newlines_and_comments()?;
-            
+
             // Parse block style value
             let value = self.parse_value()?;
             object.insert(first_key, value);
@@ -382,17 +383,17 @@ impl<'a> Parser<'a> {
             let value = self.parse_value()?;
             object.insert(first_key, value);
         }
-        
+
         self.skip_newlines_and_comments()?;
-        
+
         // Process remaining key-value pairs for this array element
         // The object continues until we hit:
         // 1. Another dash at the array's base indent (next array element)
-        // 2. A key at indent 0 (outside the array) 
+        // 2. A key at indent 0 (outside the array)
         // 3. EOF
         loop {
             self.skip_newlines_and_comments()?;
-            
+
             // Skip indent tokens and then check for string
             let current_indent = if let Token::Indent(n) = self.current_token {
                 self.advance()?;
@@ -400,9 +401,8 @@ impl<'a> Parser<'a> {
             } else {
                 0
             };
-            
+
             if let Token::String(key) = &self.current_token.clone() {
-                
                 // Check if this is a new array element
                 if let Some(array_indent) = array_base_indent {
                     if current_indent == array_indent {
@@ -415,7 +415,7 @@ impl<'a> Parser<'a> {
                         }
                     }
                 }
-                
+
                 // Check if this is a root-level key (outside the array)
                 if current_indent == 0 {
                     if let Ok(peek_token) = self.peek() {
@@ -425,7 +425,7 @@ impl<'a> Parser<'a> {
                         }
                     }
                 }
-                
+
                 // Check if we're at the expected indent level for this object
                 // For array elements, the first key is right after the dash (no extra indent)
                 // Subsequent keys should be at the same level as the first key
@@ -439,27 +439,27 @@ impl<'a> Parser<'a> {
                     // If no array base indent, this shouldn't happen in array context
                     break;
                 }
-                
+
                 let key = key.clone();
                 self.advance()?;
-                
+
                 self.skip_inline_whitespace();
-                
+
                 if !matches!(self.current_token, Token::Colon) {
                     return self.error("Expected ':' after object key");
                 }
                 self.advance()?;
-                
+
                 self.skip_inline_whitespace();
-                
+
                 // Check if there's a newline after colon (indicates block style value)
                 if matches!(self.current_token, Token::Newline) {
                     self.advance()?; // Skip newline
                     self.skip_newlines_and_comments()?;
-                    
+
                     // Parse block style value
                     let value = self.parse_value()?;
-                    
+
                     if object.contains_key(&key) {
                         if !self.options.allow_duplicate_keys {
                             return Err(Error::DuplicateKey {
@@ -469,12 +469,12 @@ impl<'a> Parser<'a> {
                             });
                         }
                     }
-                    
+
                     object.insert(key, value);
                 } else {
                     // Parse inline value
                     let value = self.parse_value()?;
-                    
+
                     if object.contains_key(&key) {
                         if !self.options.allow_duplicate_keys {
                             return Err(Error::DuplicateKey {
@@ -484,32 +484,32 @@ impl<'a> Parser<'a> {
                             });
                         }
                     }
-                    
+
                     object.insert(key, value);
                 }
-                
+
                 self.skip_newlines_and_comments()?;
             } else {
                 break;
             }
         }
-        
+
         Ok(Value::Object(object))
     }
-    
+
     fn parse_object_from_first_key(&mut self, first_key: String) -> Result<Value> {
         let mut object = HashMap::new();
         let mut expected_key_indent: Option<usize> = None;
-        
+
         // Process first key-value pair
         self.advance()?; // Skip :
         self.skip_inline_whitespace();
-        
+
         // Check if there's a newline after colon (indicates block style value)
         if matches!(self.current_token, Token::Newline) {
             self.advance()?; // Skip newline
             self.skip_newlines_and_comments()?;
-            
+
             // Parse block style value with indent context
             let current_indent = self.current_indent();
             let value = self.parse_value_with_indent_context(current_indent)?;
@@ -519,28 +519,28 @@ impl<'a> Parser<'a> {
             let value = self.parse_value()?;
             object.insert(first_key, value);
         }
-        
+
         self.skip_newlines_and_comments()?;
-        
+
         // Process remaining key-value pairs
         loop {
             // First skip newlines and comments
             self.skip_newlines_and_comments()?;
-            
+
             // Then check for indentation
             let mut current_key_indent = 0;
             if let Token::Indent(n) = self.current_token {
                 current_key_indent = n;
                 self.advance()?; // Skip the indent token
             }
-            
+
             match &self.current_token {
                 Token::String(key) => {
                     // Set expected indentation from the first key we encounter
                     if expected_key_indent.is_none() {
                         expected_key_indent = Some(current_key_indent);
                     }
-                    
+
                     // Check for consistent indentation
                     if let Some(expected) = expected_key_indent {
                         if current_key_indent != expected {
@@ -551,27 +551,27 @@ impl<'a> Parser<'a> {
                             });
                         }
                     }
-                    
+
                     let key = key.clone();
                     self.advance()?;
-                    
+
                     self.skip_inline_whitespace();
-                    
+
                     if !matches!(self.current_token, Token::Colon) {
                         return self.error("Expected ':' after object key");
                     }
                     self.advance()?;
-                    
+
                     self.skip_inline_whitespace();
-                    
+
                     // Check if there's a newline after colon (indicates block style value)
                     if matches!(self.current_token, Token::Newline) {
                         self.advance()?; // Skip newline
                         self.skip_newlines_and_comments()?;
-                        
+
                         // Parse block style value
                         let value = self.parse_value()?;
-                        
+
                         if object.contains_key(&key) {
                             if !self.options.allow_duplicate_keys {
                                 return Err(Error::DuplicateKey {
@@ -581,12 +581,12 @@ impl<'a> Parser<'a> {
                                 });
                             }
                         }
-                        
+
                         object.insert(key, value);
                     } else {
                         // Parse inline value
                         let value = self.parse_value()?;
-                        
+
                         if object.contains_key(&key) {
                             if !self.options.allow_duplicate_keys {
                                 return Err(Error::DuplicateKey {
@@ -596,10 +596,10 @@ impl<'a> Parser<'a> {
                                 });
                             }
                         }
-                        
+
                         object.insert(key, value);
                     }
-                    
+
                     self.skip_newlines_and_comments()?;
                 }
                 Token::Eof => break,
@@ -614,10 +614,10 @@ impl<'a> Parser<'a> {
                 _ => break,
             }
         }
-        
+
         Ok(Value::Object(object))
     }
-    
+
     fn parse_literal_string(&mut self) -> Result<Value> {
         let chomping = match self.current_token {
             Token::PipeStrip => ChompingIndicator::Strip,
@@ -625,27 +625,27 @@ impl<'a> Parser<'a> {
             _ => ChompingIndicator::Clip,
         };
         self.advance()?; // Skip |, |-, or |+
-        
+
         if !matches!(self.current_token, Token::Newline) {
             return self.error("Expected newline after '|'");
         }
         self.advance()?;
-        
+
         let content_indent = match self.current_token {
             Token::Indent(n) => n,
             _ => return self.error("Expected indented content after '|'"),
         };
-        
+
         // Use the specialized lexer method to read the multiline block
         let result = self.lexer.read_multiline_block(content_indent, chomping)?;
-        
+
         // Try to get the next token, but if it fails due to tokenization issues,
         // just continue parsing normally
         self.current_token = self.lexer.next_token().unwrap_or(Token::Eof);
-        
+
         Ok(Value::String(result))
     }
-    
+
     fn parse_folded_string(&mut self) -> Result<Value> {
         let chomping = match self.current_token {
             Token::GreaterStrip => ChompingIndicator::Strip,
@@ -653,27 +653,27 @@ impl<'a> Parser<'a> {
             _ => ChompingIndicator::Clip,
         };
         self.advance()?; // Skip >, >-, or >+
-        
+
         if !matches!(self.current_token, Token::Newline) {
             return self.error("Expected newline after '>'");
         }
         self.advance()?;
-        
+
         let content_indent = match self.current_token {
             Token::Indent(n) => n,
             _ => return self.error("Expected indented content after '>'"),
         };
-        
+
         // Use the specialized lexer method to read the folded block
         let result = self.lexer.read_folded_block(content_indent, chomping)?;
-        
+
         // Try to get the next token, but if it fails due to tokenization issues,
         // just continue parsing normally
         self.current_token = self.lexer.next_token().unwrap_or(Token::Eof);
-        
+
         Ok(Value::String(result))
     }
-    
+
     fn advance(&mut self) -> Result<()> {
         self.current_token = if let Some(token) = self.peek_token.take() {
             token
@@ -682,40 +682,41 @@ impl<'a> Parser<'a> {
         };
         Ok(())
     }
-    
+
     fn peek(&mut self) -> Result<&Token> {
         if self.peek_token.is_none() {
             self.peek_token = Some(self.lexer.next_token()?);
         }
         Ok(self.peek_token.as_ref().unwrap())
     }
-    
+
     fn skip_whitespace_and_comments(&mut self) -> Result<()> {
-        while matches!(self.current_token, Token::Comment(_)) || 
-              (matches!(self.current_token, Token::Newline) && self.peek().is_ok()) {
+        while matches!(self.current_token, Token::Comment(_))
+            || (matches!(self.current_token, Token::Newline) && self.peek().is_ok())
+        {
             self.advance()?;
         }
         Ok(())
     }
-    
+
     fn skip_inline_whitespace(&mut self) {
         // In JYAML, inline whitespace is handled by the lexer
     }
-    
+
     fn skip_newlines_and_comments(&mut self) -> Result<()> {
         while matches!(self.current_token, Token::Newline | Token::Comment(_)) {
             self.advance()?;
         }
         Ok(())
     }
-    
+
     fn current_indent(&self) -> usize {
         match &self.current_token {
             Token::Indent(n) => *n,
             _ => 0,
         }
     }
-    
+
     fn error<T>(&self, message: &str) -> Result<T> {
         let (line, column) = self.lexer.current_position();
         Err(Error::SyntaxError {
@@ -724,7 +725,7 @@ impl<'a> Parser<'a> {
             message: message.to_string(),
         })
     }
-    
+
     fn syntax_error(&self, message: &str) -> Error {
         let (line, column) = self.lexer.current_position();
         Error::SyntaxError {
@@ -769,13 +770,22 @@ mod tests {
         assert_eq!(parse("42").unwrap(), Value::Number(Number::Integer(42)));
         assert_eq!(parse("-10").unwrap(), Value::Number(Number::Integer(-10)));
         assert_eq!(parse("3.14").unwrap(), Value::Number(Number::Float(3.14)));
-        assert_eq!(parse("1e5").unwrap(), Value::Number(Number::Float(100000.0)));
+        assert_eq!(
+            parse("1e5").unwrap(),
+            Value::Number(Number::Float(100000.0))
+        );
     }
 
     #[test]
     fn test_parse_strings() {
-        assert_eq!(parse(r#""hello""#).unwrap(), Value::String("hello".to_string()));
-        assert_eq!(parse(r#"'world'"#).unwrap(), Value::String("world".to_string()));
+        assert_eq!(
+            parse(r#""hello""#).unwrap(),
+            Value::String("hello".to_string())
+        );
+        assert_eq!(
+            parse(r#"'world'"#).unwrap(),
+            Value::String("world".to_string())
+        );
     }
 
     #[test]
@@ -858,7 +868,7 @@ mod tests {
     fn test_parse_nested_flow() {
         let input = r#"{"users": [{"name": "Alice"}, {"name": "Bob"}]}"#;
         let result = parse(input).unwrap();
-        
+
         // Verify structure without exact comparison due to HashMap ordering
         if let Value::Object(obj) = result {
             assert!(obj.contains_key("users"));
@@ -891,7 +901,7 @@ mod tests {
         let input = r#"'can\'t stop'"#;
         let result = parse(input).unwrap();
         assert_eq!(result, Value::String("can't stop".to_string()));
-        
+
         let input2 = r#"'literal \n'"#;
         let result2 = parse(input2).unwrap();
         assert_eq!(result2, Value::String("literal \\n".to_string()));
@@ -908,16 +918,16 @@ mod tests {
     fn test_parser_errors() {
         // Unclosed string
         assert!(parse(r#""unclosed"#).is_err());
-        
+
         // Invalid number format
         assert!(parse("01234").is_err());
-        
+
         // Invalid boolean
         assert!(parse("yes").is_err());
-        
+
         // Missing colon in object
         assert!(parse(r#"{"key" "value"}"#).is_err());
-        
+
         // Trailing comma in array is now valid in JYAML 0.3
         assert!(parse("[1, 2,]").is_ok());
     }
@@ -956,7 +966,7 @@ mod tests {
         let input = "\t\"indented\"";
         let result = parse(input);
         assert!(result.is_err());
-        
+
         match result.unwrap_err() {
             Error::TabInIndentation { line, column } => {
                 assert_eq!(line, 1);
@@ -969,7 +979,7 @@ mod tests {
         let input = "\"object\":\n  \"key1\": \"value1\"\n\t\"key2\": \"value2\"";
         let result = parse(input);
         assert!(result.is_err());
-        
+
         match result.unwrap_err() {
             Error::TabInIndentation { line, column } => {
                 assert_eq!(line, 3);
@@ -982,7 +992,7 @@ mod tests {
         let input = "\"object\":\n  \t\"key\": \"value\"";
         let result = parse(input);
         assert!(result.is_err());
-        
+
         match result.unwrap_err() {
             Error::TabInIndentation { line, column } => {
                 assert_eq!(line, 2);
@@ -998,7 +1008,7 @@ mod tests {
         let input = "\"valid\"\t\"invalid\"";
         let result = parse(input);
         assert!(result.is_err());
-        
+
         // Should get tab error, not a parsing success
         match result.unwrap_err() {
             Error::TabInIndentation { .. } => {
@@ -1022,11 +1032,11 @@ mod tests {
         // Scientific notation
         assert!(parse("1.5e-10").is_ok());
         assert!(parse("2.5E+3").is_ok());
-        
+
         // Zero
         assert_eq!(parse("0").unwrap(), Value::Number(Number::Integer(0)));
         assert_eq!(parse("0.0").unwrap(), Value::Number(Number::Float(0.0)));
-        
+
         // Negative zero
         assert_eq!(parse("-0").unwrap(), Value::Number(Number::Integer(0)));
     }
@@ -1038,7 +1048,7 @@ mod tests {
 "object": {"nested": true}
 "#;
         let result = parse(input).unwrap();
-        
+
         if let Value::Object(obj) = result {
             assert!(obj.contains_key("array"));
             assert!(obj.contains_key("object"));
@@ -1051,7 +1061,7 @@ mod tests {
     fn test_parse_deep_nesting() {
         let input = r#"{"a": {"b": {"c": 42}}}"#;
         let result = parse(input).unwrap();
-        
+
         if let Value::Object(obj) = result {
             if let Some(Value::Object(a)) = obj.get("a") {
                 if let Some(Value::Object(b)) = a.get("b") {
@@ -1080,14 +1090,14 @@ mod tests {
 "config":
   "timeout": 30"#;
         let result = parse(input).unwrap();
-        
+
         if let Value::Object(obj) = result {
             assert!(obj.contains_key("users"));
             assert!(obj.contains_key("config"));
-            
+
             if let Some(Value::Array(users)) = obj.get("users") {
                 assert_eq!(users.len(), 1);
-                
+
                 // Check the user has both name and age
                 if let Some(Value::Object(user)) = users.get(0) {
                     assert_eq!(user.get("name"), Some(&Value::String("Alice".to_string())));
@@ -1113,17 +1123,20 @@ mod tests {
     "value": 100
 "end": true"#;
         let result = parse(input).unwrap();
-        
+
         if let Value::Object(obj) = result {
             if let Some(Value::Array(data)) = obj.get("data") {
                 assert_eq!(data.len(), 3);
-                
+
                 // Element 0: string
-                assert_eq!(data.get(0), Some(&Value::String("simple_string".to_string())));
-                
+                assert_eq!(
+                    data.get(0),
+                    Some(&Value::String("simple_string".to_string()))
+                );
+
                 // Element 1: number
                 assert_eq!(data.get(1), Some(&Value::Number(Number::Integer(42))));
-                
+
                 // Element 2: object with multiple keys
                 if let Some(Value::Object(obj)) = data.get(2) {
                     assert_eq!(obj.len(), 2);
@@ -1147,11 +1160,11 @@ mod tests {
     "value": 1
 "total": 10"#;
         let result = parse(input).unwrap();
-        
+
         if let Value::Object(obj) = result {
             if let Some(Value::Array(items)) = obj.get("items") {
                 assert_eq!(items.len(), 1);
-                
+
                 if let Some(Value::Object(item)) = items.get(0) {
                     assert_eq!(item.get("name"), Some(&Value::String("first".to_string())));
                     assert_eq!(item.get("value"), Some(&Value::Number(Number::Integer(1))));
@@ -1176,7 +1189,6 @@ mod tests {
         assert!(parse(input).is_err());
     }
 
-
     #[test]
     fn test_malformed_array_object_indent() {
         // Test incorrect indentation in array object
@@ -1184,12 +1196,12 @@ mod tests {
   - "name": "Alice"
 "age": 30  # Wrong indent - should be at same level as "name""#;
         let result = parse(input).unwrap();
-        
+
         // This should parse "age" as a separate top-level key, not part of the array element
         if let Value::Object(obj) = result {
             assert!(obj.contains_key("users"));
             assert!(obj.contains_key("age"));
-            
+
             if let Some(Value::Array(users)) = obj.get("users") {
                 if let Some(Value::Object(user)) = users.get(0) {
                     assert_eq!(user.len(), 1); // Only "name", not "age"
@@ -1212,12 +1224,18 @@ mod tests {
   - "level": 1
     "name": "test""#;
         let result = parse(input).unwrap();
-        
+
         if let Value::Object(obj) = result {
             if let Some(Value::Array(levels)) = obj.get("levels") {
                 if let Some(Value::Object(level_obj)) = levels.get(0) {
-                    assert_eq!(level_obj.get("level"), Some(&Value::Number(Number::Integer(1))));
-                    assert_eq!(level_obj.get("name"), Some(&Value::String("test".to_string())));
+                    assert_eq!(
+                        level_obj.get("level"),
+                        Some(&Value::Number(Number::Integer(1)))
+                    );
+                    assert_eq!(
+                        level_obj.get("name"),
+                        Some(&Value::String("test".to_string()))
+                    );
                 } else {
                     panic!("level should be an object");
                 }
@@ -1239,17 +1257,23 @@ mod tests {
       "ssl": false
   "status": "ready""#;
         let result = parse(input).unwrap();
-        
+
         if let Value::Object(obj) = result {
             if let Some(Value::Object(config)) = obj.get("config") {
                 if let Some(Value::Array(servers)) = config.get("servers") {
                     assert_eq!(servers.len(), 1);
-                    
+
                     // Check first server
                     if let Some(Value::Object(server1)) = servers.get(0) {
                         assert_eq!(server1.len(), 3);
-                        assert_eq!(server1.get("host"), Some(&Value::String("localhost".to_string())));
-                        assert_eq!(server1.get("port"), Some(&Value::Number(Number::Integer(8080))));
+                        assert_eq!(
+                            server1.get("host"),
+                            Some(&Value::String("localhost".to_string()))
+                        );
+                        assert_eq!(
+                            server1.get("port"),
+                            Some(&Value::Number(Number::Integer(8080)))
+                        );
                         assert_eq!(server1.get("ssl"), Some(&Value::Bool(false)));
                     } else {
                         panic!("First server should be an object");
@@ -1257,8 +1281,11 @@ mod tests {
                 } else {
                     panic!("servers should be an array");
                 }
-                
-                assert_eq!(config.get("status"), Some(&Value::String("ready".to_string())));
+
+                assert_eq!(
+                    config.get("status"),
+                    Some(&Value::String("ready".to_string()))
+                );
             } else {
                 panic!("config should be an object");
             }
@@ -1274,11 +1301,11 @@ mod tests {
   - "first": "key"
     "second": "key""#;
         let result = parse(input).unwrap();
-        
+
         if let Value::Object(obj) = result {
             if let Some(Value::Array(items)) = obj.get("items") {
                 assert_eq!(items.len(), 1);
-                
+
                 // Multi key object
                 if let Some(Value::Object(item1)) = items.get(0) {
                     assert_eq!(item1.len(), 2);
@@ -1302,14 +1329,17 @@ mod tests {
   - "name": "Setup"    # Task name
     "priority": 1      # High priority"#;
         let result = parse(input).unwrap();
-        
+
         if let Value::Object(obj) = result {
             if let Some(Value::Array(tasks)) = obj.get("tasks") {
                 assert_eq!(tasks.len(), 1);
-                
+
                 if let Some(Value::Object(task1)) = tasks.get(0) {
                     assert_eq!(task1.get("name"), Some(&Value::String("Setup".to_string())));
-                    assert_eq!(task1.get("priority"), Some(&Value::Number(Number::Integer(1))));
+                    assert_eq!(
+                        task1.get("priority"),
+                        Some(&Value::Number(Number::Integer(1)))
+                    );
                 } else {
                     panic!("Task 1 should be an object");
                 }
@@ -1327,14 +1357,17 @@ mod tests {
   - "title": "Example"
     "content": "This is a literal string with multiple lines preserved as-is""#;
         let result = parse(input).unwrap();
-        
+
         if let Value::Object(obj) = result {
             if let Some(Value::Array(docs)) = obj.get("docs") {
                 assert_eq!(docs.len(), 1);
-                
+
                 // Check literal string
                 if let Some(Value::Object(doc1)) = docs.get(0) {
-                    assert_eq!(doc1.get("title"), Some(&Value::String("Example".to_string())));
+                    assert_eq!(
+                        doc1.get("title"),
+                        Some(&Value::String("Example".to_string()))
+                    );
                     if let Some(Value::String(content)) = doc1.get("content") {
                         assert!(content.contains("multiple lines"));
                     } else {
@@ -1365,31 +1398,31 @@ mod tests {
   - "key": null
 "summary": "complete""#;
         let result = parse(input).unwrap();
-        
+
         if let Value::Object(obj) = result {
             if let Some(Value::Array(cases)) = obj.get("edge_cases") {
                 assert_eq!(cases.len(), 8);
-                
+
                 assert_eq!(cases.get(0), Some(&Value::Null));
                 assert_eq!(cases.get(1), Some(&Value::Bool(true)));
                 assert_eq!(cases.get(2), Some(&Value::Bool(false)));
                 assert_eq!(cases.get(3), Some(&Value::Number(Number::Integer(0))));
                 assert_eq!(cases.get(4), Some(&Value::String("".to_string())));
-                
+
                 // Empty array
                 if let Some(Value::Array(arr)) = cases.get(5) {
                     assert_eq!(arr.len(), 0);
                 } else {
                     panic!("Element 5 should be an empty array");
                 }
-                
+
                 // Empty object
                 if let Some(Value::Object(obj)) = cases.get(6) {
                     assert_eq!(obj.len(), 0);
                 } else {
                     panic!("Element 6 should be an empty object");
                 }
-                
+
                 // Object with null value
                 if let Some(Value::Object(obj)) = cases.get(7) {
                     assert_eq!(obj.get("key"), Some(&Value::Null));
@@ -1412,15 +1445,15 @@ mod tests {
     "role": "admin"
 "active": true"#;
         let result = parse(input).unwrap();
-        
+
         if let Value::Object(obj) = result {
             assert!(obj.contains_key("users"));
             assert!(obj.contains_key("active"));
-            
+
             // Check users array
             if let Some(Value::Array(users)) = obj.get("users") {
                 assert_eq!(users.len(), 1);
-                
+
                 if let Some(Value::Object(user1)) = users.get(0) {
                     assert_eq!(user1.get("name"), Some(&Value::String("Alice".to_string())));
                     assert_eq!(user1.get("role"), Some(&Value::String("admin".to_string())));
@@ -1432,5 +1465,4 @@ mod tests {
             panic!("Root should be an object");
         }
     }
-
 }

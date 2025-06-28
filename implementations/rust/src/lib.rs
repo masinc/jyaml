@@ -138,9 +138,8 @@ pub use error::{Error, Result};
 
 // Configuration options and builders
 pub use options::{
-    DeserializeOptions, DeserializeOptionsBuilder, 
+    DeserializeOptions, DeserializeOptionsBuilder, LineEnding, OutputStyle, QuoteStyle,
     SerializeOptions, SerializeOptionsBuilder,
-    OutputStyle, QuoteStyle, LineEnding
 };
 
 // Low-level parsing functions

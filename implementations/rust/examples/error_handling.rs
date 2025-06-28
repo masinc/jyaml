@@ -81,7 +81,7 @@ fn main() {
 
     // Example 10: Invalid identifier
     println!("10. Invalid identifier:");
-    let bad10 = "yes";  // YAML allows 'yes' as true, but JYAML doesn't
+    let bad10 = "yes"; // YAML allows 'yes' as true, but JYAML doesn't
     match parse(bad10) {
         Ok(value) => println!("  Unexpected success: {:?}", value),
         Err(e) => println!("  Error: {}\n", e),
@@ -97,7 +97,7 @@ fn main() {
 
     // Example 12: Unescaped control character
     println!("12. Unescaped control character:");
-    let bad12 = "\"line1\nline2\"";  // Unescaped newline
+    let bad12 = "\"line1\nline2\""; // Unescaped newline
     match parse(bad12) {
         Ok(value) => println!("  Unexpected success: {:?}", value),
         Err(e) => println!("  Error: {}\n", e),

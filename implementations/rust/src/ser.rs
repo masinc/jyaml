@@ -1,7 +1,14 @@
 //! JYAML serializer implementation
 
-use crate::{error::Result, Error, options::{SerializeOptions, OutputStyle, QuoteStyle}};
-use serde::ser::{self, Serialize, SerializeSeq, SerializeMap, SerializeTuple, SerializeTupleStruct, SerializeTupleVariant, SerializeStruct, SerializeStructVariant};
+use crate::{
+    error::Result,
+    options::{OutputStyle, QuoteStyle, SerializeOptions},
+    Error,
+};
+use serde::ser::{
+    self, Serialize, SerializeMap, SerializeSeq, SerializeStruct, SerializeStructVariant,
+    SerializeTuple, SerializeTupleStruct, SerializeTupleVariant,
+};
 use std::fmt::Write;
 
 /// Serialize a value into a JYAML string
@@ -71,7 +78,7 @@ impl Serializer {
             options,
         }
     }
-    
+
     /// Create a new serializer with custom options
     pub fn with_options(options: SerializeOptions) -> Self {
         Serializer {
@@ -110,8 +117,12 @@ impl Serializer {
         let code = code_point - 0x10000;
         let high_surrogate = 0xD800 + (code >> 10);
         let low_surrogate = 0xDC00 + (code & 0x3FF);
-        
-        write!(&mut self.output, "\\u{:04X}\\u{:04X}", high_surrogate, low_surrogate)?;
+
+        write!(
+            &mut self.output,
+            "\\u{:04X}\\u{:04X}",
+            high_surrogate, low_surrogate
+        )?;
         Ok(())
     }
 }
@@ -503,15 +514,30 @@ mod tests {
 
     #[test]
     fn test_serialize_numbers() {
-        assert_eq!(to_string(&Value::Number(Number::Integer(42))).unwrap(), "42");
-        assert_eq!(to_string(&Value::Number(Number::Integer(-10))).unwrap(), "-10");
-        assert_eq!(to_string(&Value::Number(Number::Float(3.14))).unwrap(), "3.14");
+        assert_eq!(
+            to_string(&Value::Number(Number::Integer(42))).unwrap(),
+            "42"
+        );
+        assert_eq!(
+            to_string(&Value::Number(Number::Integer(-10))).unwrap(),
+            "-10"
+        );
+        assert_eq!(
+            to_string(&Value::Number(Number::Float(3.14))).unwrap(),
+            "3.14"
+        );
     }
 
     #[test]
     fn test_serialize_strings() {
-        assert_eq!(to_string(&Value::String("hello".to_string())).unwrap(), r#""hello""#);
-        assert_eq!(to_string(&Value::String("world".to_string())).unwrap(), r#""world""#);
+        assert_eq!(
+            to_string(&Value::String("hello".to_string())).unwrap(),
+            r#""hello""#
+        );
+        assert_eq!(
+            to_string(&Value::String("world".to_string())).unwrap(),
+            r#""world""#
+        );
     }
 
     #[test]
@@ -553,14 +579,14 @@ mod tests {
         let mut obj = HashMap::new();
         obj.insert("name".to_string(), Value::String("John".to_string()));
         obj.insert("age".to_string(), Value::Number(Number::Integer(30)));
-        
+
         let value = Value::Object(obj);
         let result = to_string(&value).unwrap();
-        
+
         // Since HashMap ordering is not guaranteed, check both possible orders
         assert!(
-            result == r#"{"name": "John", "age": 30}"# ||
-            result == r#"{"age": 30, "name": "John"}"#
+            result == r#"{"name": "John", "age": 30}"#
+                || result == r#"{"age": 30, "name": "John"}"#
         );
     }
 
@@ -576,17 +602,20 @@ mod tests {
     fn test_serialize_nested_structures() {
         let mut inner_obj = HashMap::new();
         inner_obj.insert("nested".to_string(), Value::Bool(true));
-        
+
         let mut obj = HashMap::new();
-        obj.insert("array".to_string(), Value::Array(vec![
-            Value::Number(Number::Integer(1)),
-            Value::Number(Number::Integer(2)),
-        ]));
+        obj.insert(
+            "array".to_string(),
+            Value::Array(vec![
+                Value::Number(Number::Integer(1)),
+                Value::Number(Number::Integer(2)),
+            ]),
+        );
         obj.insert("object".to_string(), Value::Object(inner_obj));
-        
+
         let value = Value::Object(obj);
         let result = to_string(&value).unwrap();
-        
+
         // Check that result contains expected parts
         assert!(result.contains("[1, 2]"));
         assert!(result.contains(r#""nested": true"#));
@@ -599,17 +628,17 @@ mod tests {
         // With JYAML 0.4 spec: 4-byte chars should use surrogate pairs
         assert_eq!(result, r#""© 2023 \uD83E\uDD80""#);
     }
-    
+
     #[test]
     fn test_serialize_emoji_surrogate_pairs() {
         let value = Value::String("🚀🎉🦀".to_string());
         let result = to_string(&value).unwrap();
         // 🚀 = U+1F680 -> \uD83D\uDE80
-        // 🎉 = U+1F389 -> \uD83C\uDF89  
+        // 🎉 = U+1F389 -> \uD83C\uDF89
         // 🦀 = U+1F980 -> \uD83E\uDD80
         assert_eq!(result, r#""\uD83D\uDE80\uD83C\uDF89\uD83E\uDD80""#);
     }
-    
+
     #[test]
     fn test_serialize_mixed_unicode() {
         let value = Value::String("Hello © 🚀 World".to_string());
@@ -629,14 +658,17 @@ mod tests {
     fn test_serialize_pretty() {
         let mut obj = HashMap::new();
         obj.insert("name".to_string(), Value::String("Alice".to_string()));
-        obj.insert("numbers".to_string(), Value::Array(vec![
-            Value::Number(Number::Integer(1)),
-            Value::Number(Number::Integer(2)),
-        ]));
-        
+        obj.insert(
+            "numbers".to_string(),
+            Value::Array(vec![
+                Value::Number(Number::Integer(1)),
+                Value::Number(Number::Integer(2)),
+            ]),
+        );
+
         let value = Value::Object(obj);
         let result = to_string_pretty(&value, 2).unwrap();
-        
+
         // Pretty format should include newlines and indentation
         assert!(result.contains('\n'));
         assert!(result.contains("  ")); // indentation
@@ -650,15 +682,15 @@ mod tests {
             age: u32,
             active: bool,
         }
-        
+
         let person = Person {
             name: "Bob".to_string(),
             age: 25,
             active: true,
         };
-        
+
         let result = to_string(&person).unwrap();
-        
+
         // Check that all fields are present
         assert!(result.contains(r#""name": "Bob""#));
         assert!(result.contains(r#""age": 25"#));
@@ -676,7 +708,7 @@ mod tests {
     fn test_serialize_option() {
         let some_value: Option<i32> = Some(42);
         let none_value: Option<i32> = None;
-        
+
         assert_eq!(to_string(&some_value).unwrap(), "42");
         assert_eq!(to_string(&none_value).unwrap(), "null");
     }
@@ -693,7 +725,7 @@ mod tests {
         // Test that special float values are handled properly
         let value = Value::Number(Number::Float(0.0));
         assert_eq!(to_string(&value).unwrap(), "0");
-        
+
         let value = Value::Number(Number::Float(-0.0));
         assert_eq!(to_string(&value).unwrap(), "-0");
     }
@@ -703,18 +735,24 @@ mod tests {
         // Test that serializer correctly handles different contexts
         let complex_structure = Value::Object({
             let mut obj = HashMap::new();
-            obj.insert("flow_array".to_string(), Value::Array(vec![
-                Value::String("item1".to_string()),
-                Value::String("item2".to_string()),
-            ]));
-            obj.insert("flow_object".to_string(), Value::Object({
-                let mut inner = HashMap::new();
-                inner.insert("key".to_string(), Value::String("value".to_string()));
-                inner
-            }));
+            obj.insert(
+                "flow_array".to_string(),
+                Value::Array(vec![
+                    Value::String("item1".to_string()),
+                    Value::String("item2".to_string()),
+                ]),
+            );
+            obj.insert(
+                "flow_object".to_string(),
+                Value::Object({
+                    let mut inner = HashMap::new();
+                    inner.insert("key".to_string(), Value::String("value".to_string()));
+                    inner
+                }),
+            );
             obj
         });
-        
+
         let result = to_string(&complex_structure).unwrap();
         // Should produce valid JYAML
         assert!(result.contains("["));
@@ -731,7 +769,7 @@ mod tests {
             Value::Bool(true),
             Value::Null,
         ]);
-        
+
         let serialized = to_string(&original).unwrap();
         let parsed = crate::parse(&serialized).unwrap();
         assert_eq!(original, parsed);
