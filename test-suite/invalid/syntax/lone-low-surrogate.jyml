@@ -1,0 +1,2 @@
+# Invalid lone low surrogate
+"invalid": "\uDC00"

@@ -1,0 +1,5 @@
+# Unicode surrogate pairs for 4-byte characters (JYAML 0.4 spec)
+"emoji": "🚀🎉🦀"
+"surrogate_pairs": "\uD83D\uDE80\uD83C\uDF89\uD83E\uDD80"
+"mixed": "Hello 🌍 World"
+"copyright": "© 2023"

@@ -430,10 +430,74 @@ impl<'a> Lexer<'a> {
             }
         }
         
-        char::from_u32(code).ok_or_else(|| Error::SyntaxError {
+        // Check if this is a high surrogate (D800-DBFF)
+        if (0xD800..=0xDBFF).contains(&code) {
+            // This is a high surrogate, we need to read the low surrogate
+            match self.read_surrogate_pair(code) {
+                Ok(ch) => Ok(ch),
+                Err(_) => Err(Error::SyntaxError {
+                    line: self.line,
+                    column: self.column,
+                    message: format!("Invalid surrogate pair starting with U+{:04X}", code),
+                })
+            }
+        } else if (0xDC00..=0xDFFF).contains(&code) {
+            // This is a low surrogate without a high surrogate
+            Err(Error::SyntaxError {
+                line: self.line,
+                column: self.column,
+                message: format!("Unexpected low surrogate U+{:04X}", code),
+            })
+        } else {
+            // Regular Unicode character
+            char::from_u32(code).ok_or_else(|| Error::SyntaxError {
+                line: self.line,
+                column: self.column,
+                message: format!("Invalid unicode code point U+{:04X}", code),
+            })
+        }
+    }
+    
+    fn read_surrogate_pair(&mut self, high_surrogate: u32) -> Result<char> {
+        // Expect "\u" for the low surrogate
+        if self.current != Some('\\') {
+            return self.error("Expected '\\' for low surrogate");
+        }
+        self.advance();
+        
+        if self.current != Some('u') {
+            return self.error("Expected 'u' for low surrogate");
+        }
+        self.advance();
+        
+        // Read the low surrogate
+        let mut low_code = 0u32;
+        for _ in 0..4 {
+            match self.current {
+                Some(ch) if ch.is_ascii_hexdigit() => {
+                    low_code = low_code * 16 + ch.to_digit(16).unwrap();
+                    self.advance();
+                }
+                _ => return self.error("Invalid unicode escape sequence in low surrogate"),
+            }
+        }
+        
+        // Validate that it's actually a low surrogate
+        if !(0xDC00..=0xDFFF).contains(&low_code) {
+            return Err(Error::SyntaxError {
+                line: self.line,
+                column: self.column,
+                message: format!("Expected low surrogate (DC00-DFFF), got U+{:04X}", low_code),
+            });
+        }
+        
+        // Convert surrogate pair to Unicode code point
+        let code_point = 0x10000 + ((high_surrogate - 0xD800) << 10) + (low_code - 0xDC00);
+        
+        char::from_u32(code_point).ok_or_else(|| Error::SyntaxError {
             line: self.line,
             column: self.column,
-            message: format!("Invalid unicode code point U+{:04X}", code),
+            message: format!("Invalid unicode code point from surrogate pair U+{:04X}", code_point),
         })
     }
     
@@ -672,6 +736,56 @@ mod tests {
             let (line, col) = lexer.current_position();
             assert!(line >= 1);
             assert!(col >= 1);
+        }
+    }
+}
+
+#[cfg(test)]
+mod unicode_tests {
+    use super::*;
+
+    #[test]
+    fn test_emoji_current_state() {
+        // Test current state: emoji without escaping
+        let mut lexer = Lexer::new(r#""🚀""#).unwrap();
+        let token = lexer.next_token().unwrap();
+        if let Token::String(s) = token {
+            println!("Emoji direct: {}", s);
+            assert_eq!(s, "🚀");
+        } else {
+            panic!("Expected string token");
+        }
+    }
+    
+    #[test]
+    fn test_surrogate_pair_needed() {
+        // This should work with JYAML 0.4 spec but currently fails
+        let result = Lexer::new(r#""\uD83D\uDE80""#);
+        match result {
+            Ok(mut lexer) => {
+                match lexer.next_token() {
+                    Ok(Token::String(s)) => {
+                        println!("Surrogate pair result: {}", s);
+                        assert_eq!(s, "🚀", "Should parse surrogate pair as emoji");
+                    }
+                    Ok(other) => panic!("Expected string, got {:?}", other),
+                    Err(e) => println!("Surrogate pair parse error: {}", e),
+                }
+            }
+            Err(e) => println!("Surrogate pair lexer error: {}", e),
+        }
+    }
+    
+    #[test]
+    fn test_unicode_escapes_bmp() {
+        // Test BMP characters (should work)
+        let mut lexer = Lexer::new(r#""\u00A9\u00AE\u2603""#).unwrap();
+        let token = lexer.next_token().unwrap();
+        if let Token::String(s) = token {
+            println!("BMP Unicode: {}", s);
+            assert_eq!(s, "©®☃");
+        } else {
+            panic!("Expected string token");
         }
     }
 }

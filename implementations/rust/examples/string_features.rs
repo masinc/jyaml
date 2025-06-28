@@ -19,7 +19,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Example 3: Unicode escapes
     println!("3. Unicode escapes:");
-    let unicode_jyaml = r#""\u00A9 2023 \u{1F980} JYAML""#;
+    let unicode_jyaml = r#""\u00A9 2023 JYAML""#;
     let unicode = parse(unicode_jyaml)?;
     println!("  JYAML: {}", unicode_jyaml);
     println!("  Parsed: {:?}\n", unicode);

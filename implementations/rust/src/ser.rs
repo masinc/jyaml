@@ -71,6 +71,21 @@ impl Serializer {
         }
         Ok(())
     }
+
+    fn write_unicode_escape(&mut self, code: u32) -> Result<()> {
+        write!(&mut self.output, "\\u{:04X}", code)?;
+        Ok(())
+    }
+
+    fn write_surrogate_pair(&mut self, code_point: u32) -> Result<()> {
+        // Convert Unicode code point to UTF-16 surrogate pair
+        let code = code_point - 0x10000;
+        let high_surrogate = 0xD800 + (code >> 10);
+        let low_surrogate = 0xDC00 + (code & 0x3FF);
+        
+        write!(&mut self.output, "\\u{:04X}\\u{:04X}", high_surrogate, low_surrogate)?;
+        Ok(())
+    }
 }
 
 impl<'a> ser::Serializer for &'a mut Serializer {
@@ -149,7 +164,11 @@ impl<'a> ser::Serializer for &'a mut Serializer {
                 '\r' => self.output.push_str("\\r"),
                 '\t' => self.output.push_str("\\t"),
                 ch if ch.is_control() => {
-                    write!(&mut self.output, "\\u{:04x}", ch as u32)?;
+                    self.write_unicode_escape(ch as u32)?;
+                }
+                ch if (ch as u32) > 0xFFFF => {
+                    // 4-byte Unicode character: use surrogate pair
+                    self.write_surrogate_pair(ch as u32)?;
                 }
                 ch => self.output.push(ch),
             }
@@ -549,14 +568,33 @@ mod tests {
     fn test_serialize_unicode() {
         let value = Value::String("© 2023 🦀".to_string());
         let result = to_string(&value).unwrap();
-        assert_eq!(result, r#""© 2023 🦀""#);
+        // With JYAML 0.4 spec: 4-byte chars should use surrogate pairs
+        assert_eq!(result, r#""© 2023 \uD83E\uDD80""#);
+    }
+    
+    #[test]
+    fn test_serialize_emoji_surrogate_pairs() {
+        let value = Value::String("🚀🎉🦀".to_string());
+        let result = to_string(&value).unwrap();
+        // 🚀 = U+1F680 -> \uD83D\uDE80
+        // 🎉 = U+1F389 -> \uD83C\uDF89  
+        // 🦀 = U+1F980 -> \uD83E\uDD80
+        assert_eq!(result, r#""\uD83D\uDE80\uD83C\uDF89\uD83E\uDD80""#);
+    }
+    
+    #[test]
+    fn test_serialize_mixed_unicode() {
+        let value = Value::String("Hello © 🚀 World".to_string());
+        let result = to_string(&value).unwrap();
+        // BMP chars remain as-is, 4-byte chars become surrogate pairs
+        assert_eq!(result, r#""Hello © \uD83D\uDE80 World""#);
     }
 
     #[test]
     fn test_serialize_control_characters() {
         let value = Value::String("\u{0001}\u{001F}".to_string());
         let result = to_string(&value).unwrap();
-        assert_eq!(result, r#""\u0001\u001f""#);
+        assert_eq!(result, r#""\u0001\u001F""#);
     }
 
     #[test]

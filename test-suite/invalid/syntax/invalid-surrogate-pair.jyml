@@ -1,0 +1,2 @@
+# Invalid surrogate pair - high surrogate without low surrogate
+"invalid": "\uD83D\u0020"
