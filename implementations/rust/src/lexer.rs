@@ -526,6 +526,34 @@ impl<'a> Lexer<'a> {
         content
     }
     
+    /// Read raw content until end of line or EOF, then force advance past newline
+    pub fn read_and_consume_line(&mut self) -> String {
+        let content = self.read_raw_line();
+        // Skip newline if present
+        if self.current == Some('\n') {
+            self.advance();
+            self.at_line_start = true;
+        }
+        content
+    }
+    
+    /// Skip to next line and get the next meaningful token
+    /// Used for multiline string processing to avoid tokenizing content
+    pub fn skip_to_next_line_and_get_token(&mut self) -> Result<Token> {
+        // Skip to end of current line
+        while let Some(ch) = self.current {
+            if ch == '\n' {
+                self.advance();
+                self.at_line_start = true;
+                break;
+            }
+            self.advance();
+        }
+        
+        // Now get the next token normally
+        self.next_token()
+    }
+    
     /// Skip to the end of current line
     pub fn skip_to_line_end(&mut self) {
         while let Some(ch) = self.current {
@@ -535,6 +563,7 @@ impl<'a> Lexer<'a> {
             self.advance();
         }
     }
+    
     
 }
 

@@ -634,46 +634,36 @@ impl<'a> Parser<'a> {
         
         let mut lines = Vec::new();
         
-        // Process the literal string content manually
         loop {
-            if let Token::Indent(n) = self.current_token {
-                if n < content_indent {
-                    // Indentation decreased - end of literal block
-                    break;
-                } else if n >= content_indent {
+            match self.current_token {
+                Token::Indent(n) if n >= content_indent => {
                     let indent_diff = n - content_indent;
                     self.advance()?;
                     
-                    // Read raw line content directly from lexer
+                    // Read raw content directly from lexer, bypassing tokenization
                     let mut line = String::new();
                     for _ in 0..indent_diff {
                         line.push(' ');
                     }
-                    
-                    // Skip any remaining whitespace and read the line content
-                    self.lexer.skip_to_line_end();
-                    let raw_content = self.lexer.read_raw_line();
+                    let raw_content = self.lexer.read_and_consume_line();
                     line.push_str(&raw_content);
                     lines.push(line);
                     
-                    // Manually advance to next token
-                    if matches!(self.current_token, Token::Newline) {
-                        self.advance()?;
-                    } else {
-                        // Force advance to get next meaningful token
-                        self.advance()?;
-                    }
-                    continue;
+                    // Skip to next line and get next meaningful token
+                    self.current_token = self.lexer.skip_to_next_line_and_get_token()?;
                 }
-            } else if matches!(self.current_token, Token::Newline) {
-                lines.push(String::new());
-                self.advance()?;
-                continue;
-            } else {
-                // End of literal block
-                break;
+                Token::Indent(n) if n < content_indent => {
+                    // Indentation decreased - end of literal block
+                    break;
+                }
+                Token::Newline => {
+                    lines.push(String::new());
+                    self.advance()?;
+                }
+                _ => break,
             }
         }
+        
         
         let mut result = lines.join("\n");
         if !strip && !result.is_empty() {
@@ -700,22 +690,18 @@ impl<'a> Parser<'a> {
         let mut paragraphs = Vec::new();
         let mut current_paragraph = Vec::new();
         
-        // Process the folded string content manually
         loop {
-            if let Token::Indent(n) = self.current_token {
-                if n < content_indent {
-                    // Indentation decreased - end of folded block
-                    break;
-                } else if n >= content_indent {
+            match self.current_token {
+                Token::Indent(n) if n >= content_indent => {
                     let indent_diff = n - content_indent;
                     self.advance()?;
                     
-                    // Read raw line content directly from lexer
+                    // Read raw content directly from lexer, bypassing tokenization
                     let mut line = String::new();
                     for _ in 0..indent_diff {
                         line.push(' ');
                     }
-                    let raw_content = self.lexer.read_raw_line();
+                    let raw_content = self.lexer.read_and_consume_line();
                     line.push_str(&raw_content);
                     
                     if line.trim().is_empty() {
@@ -727,22 +713,21 @@ impl<'a> Parser<'a> {
                         current_paragraph.push(line.trim_start().to_string());
                     }
                     
-                    // Skip newline if present
-                    if matches!(self.current_token, Token::Newline) {
-                        self.advance()?;
+                    // Skip to next line and get next meaningful token
+                    self.current_token = self.lexer.skip_to_next_line_and_get_token()?;
+                }
+                Token::Indent(n) if n < content_indent => {
+                    // Indentation decreased - end of folded block
+                    break;
+                }
+                Token::Newline => {
+                    if !current_paragraph.is_empty() {
+                        paragraphs.push(current_paragraph.join(" "));
+                        current_paragraph.clear();
                     }
-                    continue;
+                    self.advance()?;
                 }
-            } else if matches!(self.current_token, Token::Newline) {
-                if !current_paragraph.is_empty() {
-                    paragraphs.push(current_paragraph.join(" "));
-                    current_paragraph.clear();
-                }
-                self.advance()?;
-                continue;
-            } else {
-                // End of folded block
-                break;
+                _ => break,
             }
         }
         
