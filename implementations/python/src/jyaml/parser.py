@@ -18,6 +18,7 @@ from .types import (
 
 class ParseOptionsKwargs(TypedDict, total=False):
     """Type definition for parse function kwargs."""
+
     strict_mode: bool
     preserve_comments: bool
     allow_duplicate_keys: bool
@@ -144,10 +145,14 @@ class Parser:
         """Skip newline and indent tokens."""
         while True:
             current = self.current_token()
-            if not (current and current.type in [
-                TokenType.NEWLINE,
-                TokenType.INDENT,
-            ]):
+            if not (
+                current
+                and current.type
+                in [
+                    TokenType.NEWLINE,
+                    TokenType.INDENT,
+                ]
+            ):
                 break
             self.advance()
 
@@ -302,9 +307,7 @@ class Parser:
                 if current and current.type == TokenType.RIGHT_BRACE:
                     self.advance()
                     break
-            elif (
-                token.type == TokenType.STRING
-            ):
+            elif token.type == TokenType.STRING:
                 peek = self.peek_token()
                 if peek and peek.type == TokenType.COLON:
                     # Another key-value pair without comma (valid in flow style with newlines)
@@ -357,7 +360,12 @@ class Parser:
         while True:
             current = self.current_token()
             peek = self.peek_token()
-            if not (current and current.type == TokenType.STRING and peek and peek.type == TokenType.COLON):
+            if not (
+                current
+                and current.type == TokenType.STRING
+                and peek
+                and peek.type == TokenType.COLON
+            ):
                 break
             # Parse key
             key_token = self.advance()
@@ -403,7 +411,9 @@ class Parser:
         # Ensure we've consumed all tokens
         current = self.current_token()
         if current and current.type != TokenType.EOF:
-            raise ParseError(f"Unexpected token after document: {current.value}", current)
+            raise ParseError(
+                f"Unexpected token after document: {current.value}", current
+            )
 
         return ParsedDocument(data=root_value, comments=self.comments)
 

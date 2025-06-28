@@ -50,9 +50,7 @@ class JYAMLObject(JYAMLValue):
 
 
 # Union type for all JYAML data types
-JYAMLData = (
-    JYAMLNull | JYAMLBool | JYAMLNumber | JYAMLString | JYAMLArray | JYAMLObject
-)
+JYAMLData = JYAMLNull | JYAMLBool | JYAMLNumber | JYAMLString | JYAMLArray | JYAMLObject
 
 # Update forward references
 JYAMLArray.model_rebuild()

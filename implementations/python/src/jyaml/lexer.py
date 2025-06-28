@@ -474,9 +474,7 @@ class Lexer:
 
         # Numbers
         peek = self.peek_char()
-        if (char and char.isdigit()) or (
-            char == "-" and peek and peek.isdigit()
-        ):
+        if (char and char.isdigit()) or (char == "-" and peek and peek.isdigit()):
             value = self.read_number()
             return Token(type=TokenType.NUMBER, value=value, line=line, column=column)
 
