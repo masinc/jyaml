@@ -1,9 +1,9 @@
 [package] 
 name = "jyaml"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 authors = ["JYAML Contributors <noreply@example.com>"]
-description = "A Rust implementation of JYAML (JSON-YAML Adaptive Markup Language) - JYAML 0.3 compliant parser with trailing comma support"
+description = "A Rust implementation of JYAML (JSON-YAML Adaptive Markup Language) - JYAML 0.4 compliant parser with flexible options and comprehensive serde integration"
 documentation = "https://docs.rs/jyaml"
 repository = "https://github.com/masinc/jyaml"
 homepage = "https://github.com/masinc/jyaml"
