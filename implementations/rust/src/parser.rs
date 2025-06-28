@@ -632,45 +632,48 @@ impl<'a> Parser<'a> {
             _ => return self.error("Expected indented content after '|'"),
         };
         
-        // Enter literal mode for reading raw content
-        self.lexer.enter_literal_mode();
-        
         let mut lines = Vec::new();
         
+        // Process the literal string content manually
         loop {
-            match self.current_token {
-                Token::Indent(n) if n >= content_indent => {
+            if let Token::Indent(n) = self.current_token {
+                if n < content_indent {
+                    // Indentation decreased - end of literal block
+                    break;
+                } else if n >= content_indent {
                     let indent_diff = n - content_indent;
                     self.advance()?;
                     
-                    // Read line content as string token
-                    if let Token::String(content) = &self.current_token {
-                        let mut line = String::new();
-                        for _ in 0..indent_diff {
-                            line.push(' ');
-                        }
-                        line.push_str(content);
-                        lines.push(line);
-                        self.advance()?; // Skip content
+                    // Read raw line content directly from lexer
+                    let mut line = String::new();
+                    for _ in 0..indent_diff {
+                        line.push(' ');
                     }
                     
-                    // Skip newline if present
+                    // Skip any remaining whitespace and read the line content
+                    self.lexer.skip_to_line_end();
+                    let raw_content = self.lexer.read_raw_line();
+                    line.push_str(&raw_content);
+                    lines.push(line);
+                    
+                    // Manually advance to next token
                     if matches!(self.current_token, Token::Newline) {
                         self.advance()?;
                     } else {
-                        break;
+                        // Force advance to get next meaningful token
+                        self.advance()?;
                     }
+                    continue;
                 }
-                Token::Newline => {
-                    lines.push(String::new());
-                    self.advance()?;
-                }
-                _ => break,
+            } else if matches!(self.current_token, Token::Newline) {
+                lines.push(String::new());
+                self.advance()?;
+                continue;
+            } else {
+                // End of literal block
+                break;
             }
         }
-        
-        // Exit literal mode
-        self.lexer.exit_literal_mode();
         
         let mut result = lines.join("\n");
         if !strip && !result.is_empty() {
@@ -697,38 +700,49 @@ impl<'a> Parser<'a> {
         let mut paragraphs = Vec::new();
         let mut current_paragraph = Vec::new();
         
+        // Process the folded string content manually
         loop {
-            match self.current_token {
-                Token::Indent(n) if n >= content_indent => {
+            if let Token::Indent(n) = self.current_token {
+                if n < content_indent {
+                    // Indentation decreased - end of folded block
+                    break;
+                } else if n >= content_indent {
                     let indent_diff = n - content_indent;
                     self.advance()?;
                     
-                    // Read raw line content
+                    // Read raw line content directly from lexer
                     let mut line = String::new();
                     for _ in 0..indent_diff {
                         line.push(' ');
                     }
-                    
-                    // Read the rest of the line as raw content
                     let raw_content = self.lexer.read_raw_line();
                     line.push_str(&raw_content);
                     
-                    current_paragraph.push(line);
+                    if line.trim().is_empty() {
+                        if !current_paragraph.is_empty() {
+                            paragraphs.push(current_paragraph.join(" "));
+                            current_paragraph.clear();
+                        }
+                    } else {
+                        current_paragraph.push(line.trim_start().to_string());
+                    }
                     
+                    // Skip newline if present
                     if matches!(self.current_token, Token::Newline) {
                         self.advance()?;
-                    } else {
-                        break;
                     }
+                    continue;
                 }
-                Token::Newline => {
-                    if !current_paragraph.is_empty() {
-                        paragraphs.push(current_paragraph.join(" "));
-                        current_paragraph.clear();
-                    }
-                    self.advance()?;
+            } else if matches!(self.current_token, Token::Newline) {
+                if !current_paragraph.is_empty() {
+                    paragraphs.push(current_paragraph.join(" "));
+                    current_paragraph.clear();
                 }
-                _ => break,
+                self.advance()?;
+                continue;
+            } else {
+                // End of folded block
+                break;
             }
         }
         

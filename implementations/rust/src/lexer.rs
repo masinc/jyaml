@@ -28,6 +28,7 @@ pub enum Token {
     Newline,
     Indent(usize),
     Comment(String),
+    RawText(String), // For literal/folded string content
     Eof,
 }
 
@@ -39,7 +40,6 @@ pub struct Lexer<'a> {
     line: usize,
     column: usize,
     at_line_start: bool,
-    literal_mode: bool,
 }
 
 impl<'a> Lexer<'a> {
@@ -67,37 +67,10 @@ impl<'a> Lexer<'a> {
             line: 1,
             column: 1,
             at_line_start: true,
-            literal_mode: false,
         })
     }
     
     pub fn next_token(&mut self) -> Result<Token> {
-        // Handle literal mode - read raw lines as string tokens
-        if self.literal_mode {
-            // In literal mode, still handle indentation at line start
-            if self.at_line_start {
-                self.at_line_start = false;
-                let indent = self.count_indent()?;
-                if indent > 0 {
-                    return Ok(Token::Indent(indent));
-                }
-            }
-            
-            // Check for newlines
-            if self.current == Some('\n') {
-                self.advance();
-                self.at_line_start = true;
-                return Ok(Token::Newline);
-            }
-            
-            // Read rest of line as a string token
-            let content = self.read_raw_line();
-            if content.is_empty() {
-                return Ok(Token::Eof);
-            }
-            return Ok(Token::String(content));
-        }
-        
         // Handle indentation at line start
         if self.at_line_start {
             self.at_line_start = false;
@@ -553,15 +526,16 @@ impl<'a> Lexer<'a> {
         content
     }
     
-    /// Enter literal mode where text is read as raw content
-    pub fn enter_literal_mode(&mut self) {
-        self.literal_mode = true;
+    /// Skip to the end of current line
+    pub fn skip_to_line_end(&mut self) {
+        while let Some(ch) = self.current {
+            if ch == '\n' {
+                break;
+            }
+            self.advance();
+        }
     }
     
-    /// Exit literal mode
-    pub fn exit_literal_mode(&mut self) {
-        self.literal_mode = false;
-    }
 }
 
 #[cfg(test)]
