@@ -536,13 +536,6 @@ impl<'a> Lexer<'a> {
         (self.line, self.column)
     }
 
-
-
-
-
-
-
-
     /// Read multiline literal string content starting at a specific indent level
     /// When this is called, lexer should be positioned at the first content character
     pub fn read_multiline_block(

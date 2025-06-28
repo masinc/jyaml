@@ -78,8 +78,7 @@ use serde::{Deserialize, Serialize};
 /// // "name": "Alice"
 /// // "age": "30"
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum OutputStyle {
     /// Compact JSON-like format with minimal whitespace
     ///
@@ -98,7 +97,6 @@ pub enum OutputStyle {
     #[default]
     Auto,
 }
-
 
 /// Quote style for string values
 ///
@@ -120,8 +118,7 @@ pub enum OutputStyle {
 /// let single_opts = SerializeOptions::builder().quote_style(QuoteStyle::Single).build();
 /// // Would output: 'Hello World' (if implemented)
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum QuoteStyle {
     /// Always use double quotes (`"`)
     ///
@@ -139,7 +136,6 @@ pub enum QuoteStyle {
     /// (e.g., double quotes if string contains single quotes).
     Auto,
 }
-
 
 /// Line ending style for serialized output
 ///
@@ -171,8 +167,7 @@ pub enum QuoteStyle {
 ///     .pretty(true)
 ///     .build();
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum LineEnding {
     /// No normalization - preserve original line endings
     ///
@@ -191,7 +186,6 @@ pub enum LineEnding {
     /// or when required by specific protocols.
     Crlf,
 }
-
 
 /// Options for deserializing JYAML from text
 ///
@@ -227,8 +221,7 @@ pub enum LineEnding {
 /// - [`permissive()`](DeserializeOptions::permissive) - Lenient parsing allowing duplicates
 /// - [`fast()`](DeserializeOptions::fast) - Fast parsing with minimal features
 /// - [`debug()`](DeserializeOptions::debug) - Debug mode with maximum information
-#[derive(Debug, Clone)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeserializeOptions {
     /// Enable strict mode parsing
     ///
@@ -361,8 +354,7 @@ impl Default for DeserializeOptions {
 /// - [`pretty()`](SerializeOptions::pretty) - Human-readable with proper formatting
 /// - [`block()`](SerializeOptions::block) - YAML-style block format
 /// - [`json_compatible()`](SerializeOptions::json_compatible) - JSON-compatible output
-#[derive(Debug, Clone)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SerializeOptions {
     /// Output style (flow, block, or auto)
     ///
