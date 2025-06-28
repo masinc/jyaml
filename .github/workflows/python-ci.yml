@@ -55,7 +55,6 @@ jobs:
         working-directory: implementations/python
         if: matrix.python-version == '3.12'  # Only run on latest version initially
         run: |
-          uv add --dev mypy
           uv run mypy src/jyaml/
       
       - name: Run tests
