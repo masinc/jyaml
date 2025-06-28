@@ -1,0 +1,55 @@
+"""JYAML (JSON-YAML Adaptive Markup Language) parser for Python."""
+
+from .parser import (
+    parse, loads, ParseOptions, LoadOptions, JYAMLMode,
+    loads_strict, loads_permissive, loads_fast, loads_ordered
+)
+from .types import (
+    JYAMLData, JYAMLNull, JYAMLBool, JYAMLNumber, JYAMLString,
+    JYAMLArray, JYAMLObject, ParsedDocument, to_python, from_python
+)
+from .lexer import Lexer, Token, TokenType, LexerError
+from .parser import Parser, ParseError
+
+__all__ = [
+    "parse", "loads", "ParseOptions", "LoadOptions", "JYAMLMode",
+    "loads_strict", "loads_permissive", "loads_fast", "loads_ordered",
+    "JYAMLData", "JYAMLNull", "JYAMLBool", "JYAMLNumber", "JYAMLString",
+    "JYAMLArray", "JYAMLObject", "ParsedDocument", "to_python", "from_python",
+    "Lexer", "Token", "TokenType", "LexerError",
+    "Parser", "ParseError"
+]
+
+
+def main():
+    """CLI entry point."""
+    import sys
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="JYAML parser")
+    parser.add_argument("file", nargs="?", help="JYAML file to parse")
+    parser.add_argument("--validate", action="store_true", help="Validate only")
+    
+    args = parser.parse_args()
+    
+    if args.file:
+        try:
+            with open(args.file, 'r', encoding='utf-8') as f:
+                content = f.read()
+        except IOError as e:
+            print(f"Error reading file: {e}", file=sys.stderr)
+            sys.exit(1)
+    else:
+        content = sys.stdin.read()
+    
+    try:
+        if args.validate:
+            parse(content)
+            print("Valid JYAML")
+        else:
+            data = loads(content)
+            import json
+            print(json.dumps(data, indent=2, ensure_ascii=False))
+    except (LexerError, ParseError) as e:
+        print(f"Parse error: {e}", file=sys.stderr)
+        sys.exit(1)
