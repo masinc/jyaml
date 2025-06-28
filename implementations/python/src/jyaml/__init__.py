@@ -53,10 +53,12 @@ def main():
     """CLI entry point."""
     import sys
     import argparse
+    import json
 
     parser = argparse.ArgumentParser(description="JYAML parser")
     parser.add_argument("file", nargs="?", help="JYAML file to parse")
     parser.add_argument("--validate", action="store_true", help="Validate only")
+    parser.add_argument("--json", action="store_true", help="Output in JSON format")
 
     args = parser.parse_args()
 
@@ -76,7 +78,10 @@ def main():
             print("Valid JYAML")
         else:
             data = loads(content)
-            print(dumps(data, style="block", indent=2))
+            if args.json:
+                print(json.dumps(data, indent=2, ensure_ascii=False))
+            else:
+                print(dumps(data, style="block", indent=2))
     except (LexerError, ParseError) as e:
         print(f"Parse error: {e}", file=sys.stderr)
         sys.exit(1)

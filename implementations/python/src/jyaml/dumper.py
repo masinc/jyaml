@@ -93,7 +93,7 @@ def _serialize_with_options(obj: Any, options: DumpOptions, depth: int = 0) -> s
         return f"{quote_char}{escaped}{quote_char}"
 
     elif isinstance(obj, (list, tuple)):
-        return _serialize_array(obj, options, depth)
+        return _serialize_array(list(obj), options, depth)
 
     elif isinstance(obj, (dict, OrderedDict)):
         return _serialize_object(obj, options, depth)

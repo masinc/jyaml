@@ -1,6 +1,6 @@
 """JYAML parser implementation."""
 
-from typing import List, Optional, Any, Dict
+from typing import List, Optional, Any, Dict, Unpack, TypedDict, Literal
 from .lexer import Lexer, Token, TokenType, LexerError
 from .options import ParseOptions
 from .types import (
@@ -15,18 +15,27 @@ from .types import (
 )
 
 
+class ParseOptionsKwargs(TypedDict, total=False):
+    """Type definition for parse function kwargs."""
+    strict_mode: bool
+    preserve_comments: bool
+    allow_duplicate_keys: bool
+    max_depth: Optional[int]
+    include_comment_positions: bool
+    normalize_line_endings: Literal["none", "lf", "crlf"]
+
+
 class ParseError(Exception):
     """Parser error with position information."""
 
     def __init__(self, message: str, token: Optional[Token] = None):
         if token:
             super().__init__(f"{message} at line {token.line}, column {token.column}")
-            self.line = token.line
-            self.column = token.column
         else:
             super().__init__(message)
-            self.line = None
-            self.column = None
+        
+        self.line: Optional[int] = token.line if token else None
+        self.column: Optional[int] = token.column if token else None
         self.message = message
 
 
@@ -125,14 +134,20 @@ class Parser:
             expected = token_type.value
             actual = token.type.value if token else "EOF"
             raise ParseError(f"Expected {expected}, got {actual}", token)
-        return self.advance()
+        token = self.advance()
+        if token is None:
+            raise ParseError(f"Expected {expected}, got EOF")
+        return token
 
-    def skip_newlines(self):
+    def skip_newlines(self) -> None:
         """Skip newline and indent tokens."""
-        while self.current_token() and self.current_token().type in [
-            TokenType.NEWLINE,
-            TokenType.INDENT,
-        ]:
+        while True:
+            current = self.current_token()
+            if not (current and current.type in [
+                TokenType.NEWLINE,
+                TokenType.INDENT,
+            ]):
+                break
             self.advance()
 
     def parse_value(self) -> JYAMLData:
@@ -160,16 +175,18 @@ class Parser:
             try:
                 # Try integer first
                 if "." not in token.value and "e" not in token.value.lower():
-                    value = int(token.value)
+                    int_value = int(token.value)
+                    return JYAMLNumber(value=int_value)
                 else:
-                    value = float(token.value)
-                return JYAMLNumber(value=value)
+                    float_value = float(token.value)
+                    return JYAMLNumber(value=float_value)
             except ValueError:
                 raise ParseError(f"Invalid number: {token.value}", token)
 
         elif token.type == TokenType.STRING:
             # Check if it's a block object (key without bracket)
-            if self.peek_token() and self.peek_token().type == TokenType.COLON:
+            peek = self.peek_token()
+            if peek and peek.type == TokenType.COLON:
                 return self.parse_block_object()
             else:
                 self.advance()
@@ -203,13 +220,11 @@ class Parser:
         self.expect(TokenType.LEFT_BRACKET)
         self.skip_newlines()
 
-        items = []
+        items: List[JYAMLData] = []
 
         # Handle empty array
-        if (
-            self.current_token()
-            and self.current_token().type == TokenType.RIGHT_BRACKET
-        ):
+        current = self.current_token()
+        if current and current.type == TokenType.RIGHT_BRACKET:
             self.advance()
             self.exit_scope()
             return JYAMLArray(value=items)
@@ -229,10 +244,8 @@ class Parser:
                 self.advance()
                 self.skip_newlines()
                 # Allow trailing comma
-                if (
-                    self.current_token()
-                    and self.current_token().type == TokenType.RIGHT_BRACKET
-                ):
+                current = self.current_token()
+                if current and current.type == TokenType.RIGHT_BRACKET:
                     self.advance()
                     break
             else:
@@ -249,10 +262,11 @@ class Parser:
         self.expect(TokenType.LEFT_BRACE)
         self.skip_newlines()
 
-        items = {}
+        items: Dict[str, JYAMLData] = {}
 
         # Handle empty object
-        if self.current_token() and self.current_token().type == TokenType.RIGHT_BRACE:
+        current = self.current_token()
+        if current and current.type == TokenType.RIGHT_BRACE:
             self.advance()
             self.exit_scope()
             return JYAMLObject(value=items)
@@ -283,19 +297,17 @@ class Parser:
                 self.advance()
                 self.skip_newlines()
                 # Allow trailing comma
-                if (
-                    self.current_token()
-                    and self.current_token().type == TokenType.RIGHT_BRACE
-                ):
+                current = self.current_token()
+                if current and current.type == TokenType.RIGHT_BRACE:
                     self.advance()
                     break
             elif (
                 token.type == TokenType.STRING
-                and self.peek_token()
-                and self.peek_token().type == TokenType.COLON
             ):
-                # Another key-value pair without comma (valid in flow style with newlines)
-                continue
+                peek = self.peek_token()
+                if peek and peek.type == TokenType.COLON:
+                    # Another key-value pair without comma (valid in flow style with newlines)
+                    continue
             else:
                 raise ParseError(
                     f"Expected ',' or '}}' in object, got {token.value}", token
@@ -307,10 +319,13 @@ class Parser:
     def parse_block_array(self) -> JYAMLArray:
         """Parse block-style array."""
         self.enter_scope()
-        items = []
+        items: List[JYAMLData] = []
         base_indent = None
 
-        while self.current_token() and self.current_token().type == TokenType.DASH:
+        while True:
+            current = self.current_token()
+            if not (current and current.type == TokenType.DASH):
+                break
             # Get current indentation level
             if base_indent is None:
                 # Find the indentation before the dash
@@ -326,9 +341,8 @@ class Parser:
             self.skip_newlines()
 
             # Check if next line has the same indentation and dash
-            if not (
-                self.current_token() and self.current_token().type == TokenType.DASH
-            ):
+            current = self.current_token()
+            if not (current and current.type == TokenType.DASH):
                 break
 
         self.exit_scope()
@@ -339,14 +353,15 @@ class Parser:
         self.enter_scope()
         items = {}
 
-        while (
-            self.current_token()
-            and self.current_token().type == TokenType.STRING
-            and self.peek_token()
-            and self.peek_token().type == TokenType.COLON
-        ):
+        while True:
+            current = self.current_token()
+            peek = self.peek_token()
+            if not (current and current.type == TokenType.STRING and peek and peek.type == TokenType.COLON):
+                break
             # Parse key
             key_token = self.advance()
+            if key_token is None:
+                raise ParseError("Unexpected end of input while parsing object key")
             key = key_token.value
 
             self.expect(TokenType.COLON)
@@ -373,7 +388,8 @@ class Parser:
         """Parse the JYAML document."""
         self.skip_newlines()
 
-        if not self.current_token() or self.current_token().type == TokenType.EOF:
+        current = self.current_token()
+        if not current or current.type == TokenType.EOF:
             # Empty document
             return ParsedDocument(data=JYAMLNull(), comments=self.comments)
 
@@ -384,9 +400,9 @@ class Parser:
         self.skip_newlines()
 
         # Ensure we've consumed all tokens
-        if self.current_token() and self.current_token().type != TokenType.EOF:
-            token = self.current_token()
-            raise ParseError(f"Unexpected token after document: {token.value}", token)
+        current = self.current_token()
+        if current and current.type != TokenType.EOF:
+            raise ParseError(f"Unexpected token after document: {current.value}", current)
 
         return ParsedDocument(data=root_value, comments=self.comments)
 
@@ -396,7 +412,7 @@ def parse(
     *,
     preset: Optional[str] = None,
     options: Optional[ParseOptions] = None,
-    **kwargs,
+    **kwargs: Unpack[ParseOptionsKwargs],
 ) -> ParsedDocument:
     """Parse JYAML text and return ParsedDocument.
 

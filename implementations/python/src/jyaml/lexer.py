@@ -99,10 +99,13 @@ class Lexer:
 
         return char
 
-    def skip_whitespace(self):
+    def skip_whitespace(self) -> None:
         """Skip whitespace characters except newlines."""
-        while self.current_char() and self.current_char() in " \t\r":
-            if self.current_char() == "\t":
+        while True:
+            char = self.current_char()
+            if not (char and char in " \t\r"):
+                break
+            if char == "\t":
                 raise LexerError("Tab character in indentation", self.line, self.column)
             self.advance()
 
@@ -188,7 +191,8 @@ class Lexer:
                         f"Invalid escape sequence: \\{escaped}", self.line, self.column
                     )
             else:
-                value += char
+                if char is not None:
+                    value += char
             self.advance()
 
         if self.current_char() != quote:
@@ -249,7 +253,9 @@ class Lexer:
             # Read line content
             line_content = ""
             while self.current_char() and self.current_char() != "\n":
-                line_content += self.current_char()
+                char = self.current_char()
+                if char is not None:
+                    line_content += char
                 self.advance()
 
             lines.append(line_content)
@@ -281,34 +287,65 @@ class Lexer:
 
         # Handle negative sign
         if self.current_char() == "-":
-            value += self.advance()
+            char = self.advance()
+            if char is not None:
+                value += char
 
         # Read integer part
-        if self.current_char() == "0":
-            value += self.advance()
-        elif self.current_char() and self.current_char().isdigit():
-            while self.current_char() and self.current_char().isdigit():
-                value += self.advance()
+        current = self.current_char()
+        if current == "0":
+            char = self.advance()
+            if char is not None:
+                value += char
+        elif current and current.isdigit():
+            while True:
+                char = self.current_char()
+                if not (char and char.isdigit()):
+                    break
+                char = self.advance()
+                if char is not None:
+                    value += char
         else:
             raise LexerError("Invalid number format", self.line, self.column)
 
         # Read decimal part
-        if self.current_char() == ".":
-            value += self.advance()
-            if not (self.current_char() and self.current_char().isdigit()):
+        current = self.current_char()
+        if current == ".":
+            char = self.advance()
+            if char is not None:
+                value += char
+            current = self.current_char()
+            if not (current and current.isdigit()):
                 raise LexerError("Invalid number format", self.line, self.column)
-            while self.current_char() and self.current_char().isdigit():
-                value += self.advance()
+            while True:
+                char = self.current_char()
+                if not (char and char.isdigit()):
+                    break
+                char = self.advance()
+                if char is not None:
+                    value += char
 
         # Read exponent part
-        if self.current_char() and self.current_char().lower() == "e":
-            value += self.advance()
-            if self.current_char() in ["+", "-"]:
-                value += self.advance()
-            if not (self.current_char() and self.current_char().isdigit()):
+        current = self.current_char()
+        if current and current.lower() == "e":
+            char = self.advance()
+            if char is not None:
+                value += char
+            current = self.current_char()
+            if current in ["+", "-"]:
+                char = self.advance()
+                if char is not None:
+                    value += char
+            current = self.current_char()
+            if not (current and current.isdigit()):
                 raise LexerError("Invalid number format", self.line, self.column)
-            while self.current_char() and self.current_char().isdigit():
-                value += self.advance()
+            while True:
+                char = self.current_char()
+                if not (char and char.isdigit()):
+                    break
+                char = self.advance()
+                if char is not None:
+                    value += char
 
         return value
 
@@ -351,16 +388,21 @@ class Lexer:
         self.advance()  # Skip #
         comment = ""
         while self.current_char() and self.current_char() != "\n":
-            comment += self.advance()
+            char = self.advance()
+            if char is not None:
+                comment += char
         return comment.strip()
 
     def read_identifier(self) -> str:
         """Read identifier (for true, false, null)."""
         value = ""
-        while self.current_char() and (
-            self.current_char().isalnum() or self.current_char() == "_"
-        ):
-            value += self.advance()
+        while True:
+            char = self.current_char()
+            if not (char and (char.isalnum() or char == "_")):
+                break
+            char = self.advance()
+            if char is not None:
+                value += char
         return value
 
     def next_token(self) -> Token:
@@ -430,14 +472,15 @@ class Lexer:
                 )
 
         # Numbers
-        if char.isdigit() or (
-            char == "-" and self.peek_char() and self.peek_char().isdigit()
+        peek = self.peek_char()
+        if (char and char.isdigit()) or (
+            char == "-" and peek and peek.isdigit()
         ):
             value = self.read_number()
             return Token(type=TokenType.NUMBER, value=value, line=line, column=column)
 
         # Identifiers (true, false, null)
-        if char.isalpha():
+        if char and char.isalpha():
             value = self.read_identifier()
             if value == "true":
                 return Token(type=TokenType.TRUE, value=value, line=line, column=column)

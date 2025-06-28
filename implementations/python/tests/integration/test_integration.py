@@ -240,7 +240,7 @@ class TestCLIIntegration:
         try:
             # Test parsing
             result = subprocess.run(
-                [sys.executable, "-m", "jyaml", temp_file],
+                [sys.executable, "-m", "jyaml", "--json", temp_file],
                 capture_output=True,
                 text=True,
                 cwd=Path(__file__).parent.parent,
@@ -299,7 +299,7 @@ class TestCLIIntegration:
         input_data = '{"from": "stdin", "works": true}'
 
         result = subprocess.run(
-            [sys.executable, "-m", "jyaml"],
+            [sys.executable, "-m", "jyaml", "--json"],
             input=input_data,
             capture_output=True,
             text=True,
