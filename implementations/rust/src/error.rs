@@ -71,6 +71,9 @@ pub enum Error {
 
     #[error("Deserialization error: {0}")]
     Deserialization(String),
+
+    #[error("Invalid options: {0}")]
+    InvalidOptions(String),
 }
 
 impl serde::de::Error for Error {

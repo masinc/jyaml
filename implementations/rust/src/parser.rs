@@ -4,6 +4,7 @@ use crate::{
     error::{Error, Result},
     lexer::{Lexer, Token},
     value::{Number, Value},
+    options::DeserializeOptions,
 };
 use std::collections::HashMap;
 
@@ -12,10 +13,16 @@ pub struct Parser<'a> {
     current_token: Token,
     peek_token: Option<Token>,
     indent_stack: Vec<usize>,
+    options: DeserializeOptions,
+    depth: usize,
 }
 
 impl<'a> Parser<'a> {
     pub fn new(input: &'a str) -> Result<Self> {
+        Self::new_with_options(input, &DeserializeOptions::default())
+    }
+    
+    pub fn new_with_options(input: &'a str, options: &DeserializeOptions) -> Result<Self> {
         let mut lexer = Lexer::new(input)?;
         let current_token = lexer.next_token()?;
         
@@ -24,6 +31,8 @@ impl<'a> Parser<'a> {
             current_token,
             peek_token: None,
             indent_stack: vec![0],
+            options: options.clone(),
+            depth: 0,
         })
     }
     
@@ -50,7 +59,19 @@ impl<'a> Parser<'a> {
     }
     
     fn parse_value(&mut self) -> Result<Value> {
-        self.parse_value_with_indent_context(0)
+        // Check max depth
+        self.depth += 1;
+        if self.depth > self.options.max_depth {
+            return Err(Error::SyntaxError {
+                line: self.lexer.current_position().0,
+                column: self.lexer.current_position().1,
+                message: format!("Maximum parsing depth {} exceeded", self.options.max_depth),
+            });
+        }
+        
+        let result = self.parse_value_with_indent_context(0);
+        self.depth -= 1;
+        result
     }
     
     fn parse_value_with_indent_context(&mut self, expected_indent: usize) -> Result<Value> {
@@ -190,11 +211,14 @@ impl<'a> Parser<'a> {
             let value = self.parse_value()?;
             
             if object.contains_key(&key) {
-                return Err(Error::DuplicateKey {
-                    line: self.lexer.current_position().0,
-                    column: self.lexer.current_position().1,
-                    key,
-                });
+                if !self.options.allow_duplicate_keys {
+                    return Err(Error::DuplicateKey {
+                        line: self.lexer.current_position().0,
+                        column: self.lexer.current_position().1,
+                        key,
+                    });
+                }
+                // If duplicates are allowed, the last value wins (default HashMap behavior)
             }
             
             object.insert(key, value);
@@ -429,11 +453,13 @@ impl<'a> Parser<'a> {
                     let value = self.parse_value()?;
                     
                     if object.contains_key(&key) {
-                        return Err(Error::DuplicateKey {
-                            line: self.lexer.current_position().0,
-                            column: self.lexer.current_position().1,
-                            key,
-                        });
+                        if !self.options.allow_duplicate_keys {
+                            return Err(Error::DuplicateKey {
+                                line: self.lexer.current_position().0,
+                                column: self.lexer.current_position().1,
+                                key,
+                            });
+                        }
                     }
                     
                     object.insert(key, value);
@@ -442,11 +468,13 @@ impl<'a> Parser<'a> {
                     let value = self.parse_value()?;
                     
                     if object.contains_key(&key) {
-                        return Err(Error::DuplicateKey {
-                            line: self.lexer.current_position().0,
-                            column: self.lexer.current_position().1,
-                            key,
-                        });
+                        if !self.options.allow_duplicate_keys {
+                            return Err(Error::DuplicateKey {
+                                line: self.lexer.current_position().0,
+                                column: self.lexer.current_position().1,
+                                key,
+                            });
+                        }
                     }
                     
                     object.insert(key, value);
@@ -522,11 +550,13 @@ impl<'a> Parser<'a> {
                         let value = self.parse_value()?;
                         
                         if object.contains_key(&key) {
-                            return Err(Error::DuplicateKey {
-                                line: self.lexer.current_position().0,
-                                column: self.lexer.current_position().1,
-                                key,
-                            });
+                            if !self.options.allow_duplicate_keys {
+                                return Err(Error::DuplicateKey {
+                                    line: self.lexer.current_position().0,
+                                    column: self.lexer.current_position().1,
+                                    key,
+                                });
+                            }
                         }
                         
                         object.insert(key, value);
@@ -535,11 +565,13 @@ impl<'a> Parser<'a> {
                         let value = self.parse_value()?;
                         
                         if object.contains_key(&key) {
-                            return Err(Error::DuplicateKey {
-                                line: self.lexer.current_position().0,
-                                column: self.lexer.current_position().1,
-                                key,
-                            });
+                            if !self.options.allow_duplicate_keys {
+                                return Err(Error::DuplicateKey {
+                                    line: self.lexer.current_position().0,
+                                    column: self.lexer.current_position().1,
+                                    key,
+                                });
+                            }
                         }
                         
                         object.insert(key, value);
@@ -763,6 +795,11 @@ impl<'a> Parser<'a> {
 /// Parse a JYAML string into a Value
 pub fn parse(input: &str) -> Result<Value> {
     let mut parser = Parser::new(input)?;
+    parser.parse()
+}
+
+pub fn parse_with_options(input: &str, options: &DeserializeOptions) -> Result<Value> {
+    let mut parser = Parser::new_with_options(input, options)?;
     parser.parse()
 }
 

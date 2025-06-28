@@ -1,6 +1,6 @@
 //! JYAML deserializer implementation
 
-use crate::{error::Result, parser, value::Value, Error};
+use crate::{error::Result, parser, value::Value, Error, options::DeserializeOptions};
 use serde::de::{self, Deserialize};
 
 /// Deserialize a JYAML string into a type that implements `serde::Deserialize`
@@ -12,6 +12,15 @@ where
     T::deserialize(&mut deserializer)
 }
 
+/// Deserialize a JYAML string with custom options into a type that implements `serde::Deserialize`
+pub fn from_str_with_options<'a, T>(s: &'a str, options: &DeserializeOptions) -> Result<T>
+where
+    T: Deserialize<'a>,
+{
+    let mut deserializer = Deserializer::from_str_with_options(s, options)?;
+    T::deserialize(&mut deserializer)
+}
+
 /// A JYAML deserializer
 pub struct Deserializer {
     value: Value,
@@ -20,7 +29,12 @@ pub struct Deserializer {
 impl Deserializer {
     /// Create a new deserializer from a JYAML string
     pub fn from_str(s: &str) -> Result<Self> {
-        let value = parser::parse(s)?;
+        Self::from_str_with_options(s, &DeserializeOptions::default())
+    }
+    
+    /// Create a new deserializer from a JYAML string with custom options
+    pub fn from_str_with_options(s: &str, options: &DeserializeOptions) -> Result<Self> {
+        let value = parser::parse_with_options(s, options)?;
         Ok(Deserializer { value })
     }
 }

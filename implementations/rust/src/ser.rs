@@ -1,6 +1,6 @@
 //! JYAML serializer implementation
 
-use crate::{error::Result, Error};
+use crate::{error::Result, Error, options::{SerializeOptions, OutputStyle, QuoteStyle}};
 use serde::ser::{self, Serialize, SerializeSeq, SerializeMap, SerializeTuple, SerializeTupleStruct, SerializeTupleVariant, SerializeStruct, SerializeStructVariant};
 use std::fmt::Write;
 
@@ -24,6 +24,16 @@ where
     Ok(serializer.output)
 }
 
+/// Serialize a value into a JYAML string with custom options
+pub fn to_string_with_options<T>(value: &T, options: &SerializeOptions) -> Result<String>
+where
+    T: Serialize,
+{
+    let mut serializer = Serializer::with_options(options.clone());
+    value.serialize(&mut serializer)?;
+    Ok(serializer.output)
+}
+
 /// A JYAML serializer
 pub struct Serializer {
     output: String,
@@ -31,28 +41,46 @@ pub struct Serializer {
     current_indent: usize,
     is_pretty: bool,
     in_flow: bool,
+    options: SerializeOptions,
 }
 
 impl Serializer {
     /// Create a new serializer with compact output
     pub fn new() -> Self {
+        let options = SerializeOptions::compact();
         Serializer {
             output: String::new(),
-            indent_size: 2,
+            indent_size: options.indent,
             current_indent: 0,
-            is_pretty: false,
+            is_pretty: options.pretty,
             in_flow: false,
+            options,
         }
     }
 
     /// Create a new serializer with pretty-printed output
     pub fn pretty(indent_size: usize) -> Self {
+        let mut options = SerializeOptions::pretty();
+        options.indent = indent_size;
         Serializer {
             output: String::new(),
             indent_size,
             current_indent: 0,
             is_pretty: true,
             in_flow: false,
+            options,
+        }
+    }
+    
+    /// Create a new serializer with custom options
+    pub fn with_options(options: SerializeOptions) -> Self {
+        Serializer {
+            output: String::new(),
+            indent_size: options.indent,
+            current_indent: 0,
+            is_pretty: options.pretty,
+            in_flow: false,
+            options,
         }
     }
 
@@ -324,7 +352,7 @@ impl<'a> ser::SerializeSeq for &'a mut Serializer {
     fn end(self) -> Result<()> {
         if self.in_flow {
             self.output.push(']');
-            self.in_flow = false;
+            // Don't set in_flow = false here, as we might still be in a flow context
         } else {
             self.current_indent = self.current_indent.saturating_sub(self.indent_size);
         }
@@ -414,7 +442,7 @@ impl<'a> ser::SerializeMap for &'a mut Serializer {
     fn end(self) -> Result<()> {
         if self.in_flow {
             self.output.push('}');
-            self.in_flow = false;
+            // Don't set in_flow = false here, as we might still be in a flow context
         } else {
             self.current_indent = self.current_indent.saturating_sub(self.indent_size);
         }
