@@ -2,6 +2,8 @@
 
 A Rust library for parsing and serializing JYAML (JSON-YAML Adaptive Markup Language).
 
+> **Note**: Currently has known issues with indentation validation and nested object parsing that are being addressed.
+
 ## Features
 
 - Full JYAML 0.2 specification support
